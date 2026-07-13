@@ -3,94 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>투포켓 (Two-Pocket) - 2인 공동자산 가계부</title>
-  <meta name="description" content="주머니는 각자 따로, 공유는 투명하게! 각자 자산의 독립성은 지키고 공유 포켓은 투명하게 비춰 보는 2인 자산 가계부 서비스 '투포켓' 프로토타입 시뮬레이터입니다.">
-  <!-- Firebase Compat SDKs (CDN) -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <link rel="stylesheet" href="style.css">
+  <title>투포켓 - 주머니는 각자 따로, 관리는 같이!</title>
+  <link rel="stylesheet" href="./style.css">
+  
+  <!-- Firebase Core SDK 및 Firestore CDN 로드 -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
 <body>
-  <div id="simulator-shell">
-    <!-- 시뮬레이터 상단 제어 바 -->
-    <header class="shell-header">
-      <div class="shell-title">
-        <span>투포켓 (Two-Pocket) 2인 시뮬레이터</span>
-      </div>
-      <div style="font-size: 0.8rem; color: var(--color-text-muted);">
-        💡 각 화면 하단 네비게이션을 탭하여 시점을 전환하세요.
-      </div>
+  <!-- 모바일 1인 기기 뷰포트 구조 -->
+  <div class="mobile-app-container">
+    <!-- 상단 헤더 -->
+    <header class="app-header">
+      <h1 class="logo-text paperlogy-title">투포켓</h1>
+      <span class="user-role-badge" id="app-role-badge">로컬 모드</span>
     </header>
 
-    <!-- 스플릿 뷰 작업 공간 -->
-    <div id="workspace-container">
-      
-      <!-- 동글이(A) 가계부 화면 -->
-      <div class="workspace-panel active-user" id="panel-user-a">
-        <div class="user-badge user-a">
-          <span>동글이 (관리자)</span>
-        </div>
-        
-        <div class="user-content" id="user-a-viewport">
-          <!-- dashboard.js 에 의해 렌더링됨 -->
-        </div>
-
-        <!-- 하단 고정 네비게이션 (동글이) -->
-        <nav class="bottom-nav" id="nav-user-a">
-          <button class="nav-item active" data-tab="dash">
-            <span class="nav-icon">🏠</span>
-            <span class="nav-label">홈</span>
-          </button>
-          <button class="nav-item" data-tab="txs">
-            <span class="nav-icon">📝</span>
-            <span class="nav-label">거래</span>
-          </button>
-          <button class="nav-item" data-tab="assets">
-            <span class="nav-icon">🏦</span>
-            <span class="nav-label">자산</span>
-          </button>
-          <button class="nav-item" data-tab="my">
-            <span class="nav-icon">⚙️</span>
-            <span class="nav-label">마이</span>
-          </button>
-        </nav>
+    <!-- 메인 대시보드 영역 (동적 렌더링) -->
+    <main class="app-main-content" id="app-viewport">
+      <div style="text-align: center; padding: 50px 20px; color: var(--color-text-muted);">
+        투포켓을 불러오는 중...
       </div>
+    </main>
 
-      <!-- 몽글이(B) 가계부 화면 -->
-      <div class="workspace-panel" id="panel-user-b">
-        <div class="user-badge user-b">
-          <span>몽글이 (참여자)</span>
-        </div>
-        
-        <div class="user-content" id="user-b-viewport">
-          <!-- dashboard.js 에 의해 렌더링됨 -->
-        </div>
-
-        <!-- 하단 고정 네비게이션 (몽글이) -->
-        <nav class="bottom-nav" id="nav-user-b">
-          <button class="nav-item active" data-tab="dash">
-            <span class="nav-icon">🏠</span>
-            <span class="nav-label">홈</span>
-          </button>
-          <button class="nav-item" data-tab="txs">
-            <span class="nav-icon">📝</span>
-            <span class="nav-label">거래</span>
-          </button>
-          <button class="nav-item" data-tab="assets">
-            <span class="nav-icon">🏦</span>
-            <span class="nav-label">자산</span>
-          </button>
-          <button class="nav-item" data-tab="my">
-            <span class="nav-icon">⚙️</span>
-            <span class="nav-label">마이</span>
-          </button>
-        </nav>
-      </div>
-
-    </div>
+    <!-- 하단 고정 네비게이션 바 -->
+    <nav class="app-nav-bar" id="app-bottom-nav" style="display: none;">
+      <button class="nav-btn active" data-tab="home">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">홈</span>
+      </button>
+      <button class="nav-btn" data-tab="assets">
+        <span class="nav-icon">👛</span>
+        <span class="nav-text">자산</span>
+      </button>
+      <button class="nav-btn" data-tab="txs">
+        <span class="nav-icon">📝</span>
+        <span class="nav-text">기록</span>
+      </button>
+      <button class="nav-btn" data-tab="my">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-text">마이</span>
+      </button>
+    </nav>
   </div>
 
-  <!-- ES 모듈 방식 로드 -->
-  <script type="module" src="app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>

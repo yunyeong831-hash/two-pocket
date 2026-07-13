@@ -1,292 +1,382 @@
-/* 토스(Toss) 금융 앱 스타일 디자인 시스템 (style.css) */
+/* 투포켓 메인 스타일시트 (style.css) */
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* 눈누 Paperlogy(페이퍼로지) 폰트 직접 다운로드/연동 */
 @font-face {
     font-family: 'Paperlogy';
-    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/2411-3@1.0/Paperlogy-5Medium.woff2') format('woff2');
     font-weight: 500;
     font-style: normal;
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/2406-02@1.0/Paperlogy-5Medium.woff2') format('woff2');
 }
-
 @font-face {
     font-family: 'Paperlogy';
-    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/2411-3@1.0/Paperlogy-8ExtraBold.woff2') format('woff2');
     font-weight: 800;
     font-style: normal;
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/2406-02@1.0/Paperlogy-8ExtraBold.woff2') format('woff2');
 }
 
 :root {
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-bg: #F2F4F6;
+  --color-card-bg: #FFFFFF;
+  --color-text: #191F28;
+  --color-text-light: #4E5968;
+  --color-text-muted: #8B95A1;
+  --color-border: #E5E8EB;
   
-  /* Toss Light Theme Colors */
-  --color-bg: #F2F4F6;           /* 토스 앱 전형적인 연회색 배경 */
-  --color-card-bg: #FFFFFF;      /* 순백색 카드 */
-  --color-border: #E5E8EB;       /* 얇고 은은한 회색 테두리 */
-  
-  /* Toss Typography Colors */
-  --color-text: #191F28;         /* 주 텍스트 (다크 그레이) */
-  --color-text-light: #4E5968;   /* 보조 텍스트 (미디엄 그레이) */
-  --color-text-muted: #8B95A1;   /* 캡션/설명 텍스트 (라이트 그레이) */
-  
-  /* Toss Action Colors */
-  --color-blue: #3182F6;         /* 토스 대표 블루 */
-  --color-blue-hover: #1B64DA;
-  --color-blue-bg: #E8F3FF;      /* 보조용 연파랑 배경 */
-  
-  --color-red: #F04452;          /* 토스 레드 (경고/지출) */
-  --color-red-bg: #FEE5E6;
-  
-  --color-green: #00D282;        /* 토스 그린 (성공/수입) */
-  --color-green-bg: #E4F9F1;
-  
-  --color-purple: #7B3FE4;
-  --color-purple-bg: #F0E8FF;
+  --color-blue: #3182F6;
+  --color-blue-bg: #E8F3FF;
+  --color-green: #00D282;
+  --color-green-bg: #E3FCF2;
+  --color-red: #F04452;
+  --color-red-bg: #FEECEF;
+  --color-pink: #FF4B91;
+  --color-pink-bg: #FFE5EC;
 
-  --color-yellow: #FFB300;
-  --color-yellow-bg: #FFF8E1;
+  --border-radius-sm: 8px;
+  --border-radius-md: 14px;
+  --border-radius-lg: 24px;
   
-  /* Toss Shadow & Border Radius */
-  --shadow-cute: 0 8px 24px rgba(0, 0, 0, 0.04);
-  --border-radius-lg: 20px;      /* 토스 카드의 부드러운 라운딩 */
-  --border-radius-md: 12px;      /* 버튼, 입력창 */
-  --border-radius-sm: 6px;       /* 소형 태그 */
+  --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --box-shadow-cute: 0px 8px 24px rgba(0, 0, 0, 0.04);
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: var(--font-family);
-  color: var(--color-text);
-  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background-color: var(--color-bg);
+  color: var(--color-text);
+  display: flex;
+  justify-content: center;
+  align-items: center;
   min-height: 100vh;
-  padding: 20px;
+  overflow: hidden;
 }
 
-/* 듀얼 시뮬레이터 레이아웃 */
-#simulator-shell {
+/* 📱 모바일 단일 앱 컨테이너 */
+.mobile-app-container {
+  width: 100%;
+  max-width: 440px; /* PC로 보면 폰 프레임 형태 */
+  height: 100vh;
+  max-height: 900px;
+  background-color: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  box-shadow: 0px 16px 48px rgba(0, 0, 0, 0.08);
+  border-radius: var(--border-radius-lg);
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 40px);
-  max-width: 1400px;
-  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
 }
 
-header.shell-header {
+/* 진짜 스마트폰/모바일 환경에서는 꽉 채우기 */
+@media (max-width: 480px) {
+  .mobile-app-container {
+    max-width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+  }
+}
+
+/* 🏷️ 상단 앱 헤더 */
+.app-header {
+  height: 56px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
-  background-color: var(--color-card-bg);
-  border-radius: var(--border-radius-md);
-  margin-bottom: 20px;
-  box-shadow: var(--shadow-cute);
+  background: #FFFFFF;
+  z-index: 10;
 }
 
-.shell-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-blue);
+.logo-text {
+  font-family: 'Paperlogy', sans-serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--color-text);
+  letter-spacing: -0.5px;
 }
 
-.shell-title::before {
-  content: "🔵";
-  font-size: 1.3rem;
-}
-
-/* 다이어리 뷰 영역 (A/B 듀얼 스플릿) */
-#workspace-container {
-  display: flex;
-  gap: 20px;
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-}
-
-.workspace-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--color-card-bg);
-  border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow-cute);
-  overflow: hidden;
-  position: relative;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.workspace-panel.active-user {
-  box-shadow: 0 12px 32px rgba(49, 130, 246, 0.12);
-}
-
-.workspace-panel.active-user::after {
-  content: "편집중";
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  background-color: var(--color-blue-bg);
+.user-role-badge {
+  background: var(--color-blue-bg);
   color: var(--color-blue);
   font-size: 0.72rem;
   font-weight: 700;
   padding: 4px 10px;
   border-radius: 20px;
-  z-index: 10;
 }
 
-.user-badge {
-  padding: 14px 20px;
-  font-size: 0.95rem;
+/* 📈 메인 동적 컨텐츠 뷰포트 */
+.app-main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 16px 80px 16px; /* 하단 네비게이션이 가리지 않도록 마진 보장 */
+  background-color: #F8F9FA;
+  scroll-behavior: smooth;
+}
+
+/* 🧭 하단 앱 네비게이션 바 */
+.app-nav-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--color-border);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 4px 8px;
+  z-index: 100;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  gap: 3px;
+}
+
+.nav-btn .nav-icon {
+  font-size: 1.3rem;
+  transition: var(--transition-smooth);
+}
+
+.nav-btn .nav-text {
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.nav-btn:hover {
+  color: var(--color-text-light);
+}
+
+.nav-btn.active {
+  color: var(--color-blue);
+}
+
+.nav-btn.active .nav-icon {
+  transform: scale(1.15);
+}
+
+/* 🎨 투포켓 폰트 가중치 클래스 */
+.paperlogy-title {
+  font-family: 'Paperlogy', sans-serif !important;
+  font-weight: 800 !important;
+}
+
+.paperlogy-sub {
+  font-family: 'Paperlogy', sans-serif !important;
+  font-weight: 500 !important;
+}
+
+/* 💌 카드(Toss 스카이 스타일) */
+.cute-card {
+  background: var(--color-card-bg);
+  border-radius: var(--border-radius-md);
+  padding: 18px;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--box-shadow-cute);
+  transition: var(--transition-smooth);
+}
+
+.cute-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0px 12px 30px rgba(0, 0, 0, 0.06);
+}
+
+.cute-card-title {
+  font-size: 1.05rem;
   font-weight: 700;
-  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+/* 🏷️ 스티커 라벨 */
+.sticker {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.sticker.blue { background: var(--color-blue-bg); color: var(--color-blue); }
+.sticker.mint { background: var(--color-green-bg); color: var(--color-green); }
+.sticker.pink { background: var(--color-pink-bg); color: var(--color-pink); }
+.sticker.yellow { background: #FFF9E6; color: #FFA800; }
+
+/* 💵 자산 통계 요약 카드 전용 */
+.summary-card-full {
+  background: linear-gradient(135deg, #3182F6 0%, #1A6BE6 100%);
+  color: #FFFFFF;
+  border: none;
+}
+
+.summary-card-full:hover {
+  transform: translateY(-2px);
+  box-shadow: 0px 14px 32px rgba(49, 130, 246, 0.25);
+}
+
+.summary-card-full .total-asset-val {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 6px 0;
+  letter-spacing: -0.5px;
+}
+
+/* 🎛️ 인풋 / 셀렉트 인풋 스타일 */
+.cute-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-light);
+  margin-bottom: 6px;
+  display: block;
+}
+
+.cute-input, .cute-select, .cute-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  background-color: #F8F9FA;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 16px;
+  transition: var(--transition-smooth);
+}
+
+.cute-input:focus, .cute-select:focus, .cute-textarea:focus {
+  outline: none;
+  border-color: var(--color-blue);
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(49, 130, 246, 0.12);
+}
+
+.cute-textarea {
+  resize: none;
+}
+
+/* 🔘 버튼 */
+.cute-btn {
+  padding: 12px 20px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-radius: var(--border-radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.cute-btn.primary {
+  background-color: var(--color-blue);
+  color: #FFFFFF;
+}
+
+.cute-btn.primary:hover {
+  background-color: #1A6BE6;
+}
+
+.cute-btn.secondary {
+  background-color: var(--color-blue-bg);
+  color: var(--color-blue);
+}
+
+.cute-btn.secondary:hover {
+  background-color: #D9EBFF;
+}
+
+.cute-btn.neutral {
+  background-color: #F2F4F6;
+  color: var(--color-text-light);
+}
+
+.cute-btn.neutral:hover {
+  background-color: #E5E8EB;
+}
+
+.cute-btn-sm {
+  padding: 8px 14px;
+  font-size: 0.8rem;
+}
+
+/* 📊 도넛 차트 컨테이너 */
+.donut-chart-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 16px;
+}
+
+.chart-graphic {
+  position: relative;
+  width: 130px;
+  height: 130px;
+}
+
+.chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.legend-item {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.user-badge.user-a { background-color: #FAFAFB; }
-.user-badge.user-b { background-color: #FAFAFB; }
-.user-badge.user-a span { color: var(--color-blue); }
-.user-badge.user-b span { color: #00D282; }
-
-/* 뷰포트 내부 스크롤 영역 (하단 탭 영역 제외) */
-.user-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  padding: 20px 20px 80px 20px; /* 하단 탭 공간 확보 */
-  position: relative;
+.legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
-/* 토스 스타일 둥근 배지 */
-.sticker {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 700;
-  font-size: 0.8rem;
-  margin-bottom: 12px;
-  border: none;
-}
-
-.sticker.pink { background-color: var(--color-red-bg); color: var(--color-red); }
-.sticker.yellow { background-color: var(--color-yellow-bg); color: var(--color-yellow); }
-.sticker.mint { background-color: var(--color-green-bg); color: var(--color-green); }
-.sticker.purple { background-color: var(--color-purple-bg); color: var(--color-purple); }
-.sticker.blue { background-color: var(--color-blue-bg); color: var(--color-blue); }
-
-/* 토스 스타일 카드 */
-.cute-card {
-  background-color: var(--color-card-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-lg);
-  padding: 20px;
-  margin-bottom: 16px;
-  position: relative;
-}
-
-.cute-card-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin-bottom: 14px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 폼 요소 디자인 */
-.cute-input, .cute-select, .cute-textarea {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-md);
-  background-color: #FAFBFB;
-  font-size: 0.92rem;
-  color: var(--color-text);
-  margin-bottom: 12px;
-  outline: none;
-  transition: border-color 0.2s, background-color 0.2s;
-}
-
-.cute-input:focus, .cute-select:focus, .cute-textarea:focus {
-  border-color: var(--color-blue);
-  background-color: #FFFFFF;
-}
-
-.cute-label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--color-text-light);
-  margin-bottom: 4px;
-  margin-left: 2px;
-}
-
-/* 토스 스타일 버튼 */
-.cute-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 12px 20px;
-  border: none;
-  border-radius: var(--border-radius-md);
-  font-weight: 600;
-  font-size: 0.92rem;
-  cursor: pointer;
-  transition: background-color 0.15s, opacity 0.15s;
-  user-select: none;
-  text-decoration: none;
-}
-
-.cute-btn:active {
-  opacity: 0.8;
-}
-
-.cute-btn.primary { background-color: var(--color-blue); color: #FFFFFF; }
-.cute-btn.primary:hover { background-color: var(--color-blue-hover); }
-
-.cute-btn.secondary { background-color: var(--color-blue-bg); color: var(--color-blue); }
-.cute-btn.secondary:hover { background-color: #D2E7FF; }
-
-.cute-btn.success { background-color: var(--color-green-bg); color: var(--color-green); }
-.cute-btn.success:hover { background-color: #CFF3E6; }
-
-.cute-btn.neutral { background-color: #F2F4F6; color: var(--color-text-light); }
-.cute-btn.neutral:hover { background-color: #E5E8EB; }
-
-.cute-btn-sm {
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  border-radius: 8px;
-}
-
-/* 토글 스위치 */
+/* 🔄 스위치 토글 디자인 */
 .switch-container {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 12px;
 }
+
 .cute-switch {
   position: relative;
   display: inline-block;
-  width: 44px;
-  height: 24px;
+  width: 48px;
+  height: 26px;
 }
+
 .cute-switch input {
   opacity: 0;
   width: 0;
   height: 0;
 }
+
 .slider {
   position: absolute;
   cursor: pointer;
@@ -295,321 +385,170 @@ header.shell-header {
   right: 0;
   bottom: 0;
   background-color: #E5E8EB;
-  transition: .2s;
-  border-radius: 24px;
+  transition: .4s;
+  border-radius: 34px;
 }
+
 .slider:before {
   position: absolute;
   content: "";
   height: 20px;
   width: 20px;
-  left: 2px;
-  bottom: 2px;
-  background-color: #FFFFFF;
-  transition: .2s;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
   border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
 }
+
 input:checked + .slider {
   background-color: var(--color-blue);
 }
+
 input:checked + .slider:before {
-  transform: translateX(20px);
+  transform: translateX(22px);
 }
 
-/* 📲 하단 고정 네비게이션 바 (Toss App Bottom Bar) */
-.bottom-nav {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 64px;
-  background-color: rgba(255, 255, 255, 0.95);
-  border-top: 1px solid var(--color-border);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  z-index: 100;
-  backdrop-filter: blur(10px);
-}
-
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  height: 100%;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: color 0.15s;
-}
-
-.nav-icon {
-  font-size: 1.25rem;
-  margin-bottom: 4px;
-}
-
-.nav-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--color-text-light);
-}
-
-.nav-item.active .nav-label {
-  color: var(--color-blue);
-}
-.nav-item.active .nav-icon {
-  transform: scale(1.1);
-  transition: transform 0.2s ease;
-}
-
-/* 대시보드 지표 카드 그룹 */
-.summary-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.summary-card-full {
-  grid-column: span 2;
-  background-color: var(--color-card-bg);
+/* 🔗 안내 박스 배너 */
+.info-box {
+  background-color: #FAFBFB;
   border: 1px solid var(--color-border);
-}
-
-.total-asset-val {
-  font-size: 1.85rem;
-  font-weight: 700;
-  margin: 8px 0 4px 0;
-  color: var(--color-text);
+  border-radius: var(--border-radius-md);
+  padding: 14px 18px;
+  margin-bottom: 12px;
   display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-.total-asset-val span {
-  font-size: 1.15rem;
-  color: var(--color-text);
-}
-
-.trend-badge {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 20px;
-  display: inline-flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 2px;
-}
-.trend-badge.up {
-  background-color: var(--color-red-bg);
-  color: var(--color-red);
-}
-.trend-badge.down {
-  background-color: var(--color-blue-bg);
-  color: var(--color-blue);
+  font-size: 0.82rem;
+  color: var(--color-text-light);
+  line-height: 1.4;
 }
 
-/* 자산/거래 목록 아이템 */
+/* 📌 리스트 로우 스타일 */
 .item-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 0;
-  border: none;
-  border-bottom: 1px solid var(--color-border);
-  background-color: transparent !important;
+  padding: 12px 0;
+  border-bottom: 1px solid #F2F4F6;
 }
+
 .item-row:last-child {
   border-bottom: none;
 }
-.item-row:hover {
-  background-color: transparent;
-}
+
 .item-info {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
+
 .item-title {
+  font-size: 0.9rem;
   font-weight: 600;
-  font-size: 0.92rem;
   color: var(--color-text);
 }
+
 .item-sub {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-}
-.item-value {
-  font-weight: 700;
-  font-size: 1rem;
-  text-align: right;
-  color: var(--color-text);
-}
-
-/* 유형별 자산 그리드 (2x2) */
-.asset-type-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.asset-type-box {
-  background-color: #FAFBFB;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-md);
-  padding: 14px;
-}
-.asset-type-label {
   font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-light);
-  margin-bottom: 4px;
+  color: var(--color-text-muted);
 }
-.asset-type-val {
-  font-size: 0.98rem;
+
+.item-value {
+  font-size: 0.95rem;
   font-weight: 700;
-  color: var(--color-text);
 }
 
-/* 동적 도넛 차트 구현을 위한 CSS */
-.donut-chart-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  margin: 16px 0;
-}
-.chart-graphic {
-  position: relative;
-  width: 110px;
-  height: 110px;
-}
-.chart-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-}
-.legend-color {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-/* 토스 스타일 둥근 경고/정보 상자 */
-.info-box {
-  background-color: #FAFBFB;
-  padding: 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-md);
-  font-size: 0.78rem;
-  color: var(--color-text-light);
-  line-height: 1.5;
-  margin-bottom: 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-/* ⚙️ Toss 설정 페이지 전용 클래스 */
+/* ⚙️ 세팅 섹션 타이틀 */
 .setting-section-title {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--color-text-muted);
-  margin: 16px 0 8px 4px;
   text-transform: uppercase;
+  margin: 20px 0 8px 4px;
+  letter-spacing: 0.5px;
 }
+
 .setting-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 12px;
-  background-color: #FAFBFB;
-  border-radius: var(--border-radius-md);
-  margin-bottom: 8px;
-  border: 1px solid var(--color-border);
+  padding: 12px 0;
+  border-bottom: 1px solid #F2F4F6;
 }
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
 .setting-info {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
+
 .setting-title {
-  font-weight: 600;
   font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
+
 .setting-sub {
+  font-size: 0.78rem;
+  color: var(--color-text-light);
+  line-height: 1.4;
+}
+
+/* 🍄 자산 목록 그리드 */
+.asset-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.asset-type-box {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-md);
+  padding: 12px;
+  text-align: left;
+}
+
+.asset-type-label {
   font-size: 0.75rem;
   color: var(--color-text-muted);
+  margin-bottom: 4px;
 }
 
-/* 토스트 알림 (Toss Style) */
+.asset-type-val {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+/* 🍞 Toss Style Toast Message */
 .toast-msg {
   position: absolute;
-  bottom: 80px; /* 네비게이션 바 위로 띄움 */
+  bottom: 84px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(25, 31, 40, 0.9);
-  color: #FFF;
-  padding: 10px 20px;
+  background: rgba(25, 31, 40, 0.92);
+  color: #FFFFFF;
+  padding: 10px 18px;
   border-radius: 30px;
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  z-index: 2000;
+  box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.16);
   pointer-events: none;
-  animation: fade-in-out 2.2s forwards;
-  z-index: 150;
-}
-.toast-msg span {
-  color: #FFF;
+  animation: toast-in-out 2.2s forwards;
+  white-space: nowrap;
 }
 
-@keyframes fade-in-out {
-  0% { opacity: 0; transform: translate(-50%, 15px); }
-  12% { opacity: 1; transform: translate(-50%, 0); }
-  88% { opacity: 1; transform: translate(-50%, 0); }
-  100% { opacity: 0; transform: translate(-50%, -15px); }
+@keyframes toast-in-out {
+  0% { opacity: 0; transform: translate(-50%, 10px); }
+  10% { opacity: 1; transform: translate(-50%, 0); }
+  90% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
 }
-
-@media(max-width: 900px) {
-  #workspace-container {
-    flex-direction: column;
-  }
-}
-
-/* Paperlogy 타이틀 폰트 클래스 */
-.paperlogy-title {
-  font-family: 'Paperlogy', sans-serif !important;
-  font-weight: 800 !important;
-}
-
-/* Paperlogy 서브 폰트 클래스 (가독성 높은 두께 500) */
-.paperlogy-sub {
-  font-family: 'Paperlogy', sans-serif !important;
-  font-weight: 500 !important;
-}
-
-/* 모바일 단독 디바이스 모드 스타일 */
-body.mobile-mode {
-  padding: 0;
-}
-body.mobile-mode #simulator-shell {
-  height: 100vh;
-  max-width: 100%;
-}
-body.mobile-mode header.shell-header {
-  display: none;
-}
-body.mobile-mode #workspace-container {
-  gap: 0;
-}
-
-
-

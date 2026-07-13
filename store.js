@@ -36,9 +36,11 @@ const INITIAL_DATA = {
     includeHiddenTxInSummary: true
   },
 
-  // Firebase 실시간 무선 동기화 설정을 위한 필드 추가
   firebaseConfig: null, 
-  walletId: null // Firestore 문서 연동 ID
+  walletId: null,
+  
+  // 1인 기기 뷰포트를 위해 브라우저 세션에 저장될 고유의 내 역할 ID
+  myUserId: null 
 };
 
 // 🌐 Firebase Firestore 실시간 동기화 브릿지 매니저
@@ -50,7 +52,6 @@ class FirebaseSyncManager {
     this.unsubscribers = [];
   }
 
-  // Firebase 설정 초기화
   init(config) {
     if (!config) return false;
     try {
@@ -60,7 +61,6 @@ class FirebaseSyncManager {
       }
       
       const appName = "two_pocket_app";
-      // 이미 생성된 앱이 있다면 재사용
       const existingApp = window.firebase.apps.find(a => a.name === appName);
       if (existingApp) {
         this.app = existingApp;
@@ -83,7 +83,6 @@ class FirebaseSyncManager {
     return this.active && this.db !== null;
   }
 
-  // 연결 해제 및 리스너 해제
   disconnect() {
     this.unsubscribers.forEach(unsub => unsub());
     this.unsubscribers = [];
@@ -92,15 +91,12 @@ class FirebaseSyncManager {
     this.app = null;
   }
 
-  // Firestore 데이터 변경 실시간 감시 (onSnapshot)
   subscribe(walletId, onWalletUpdate, onAssetsUpdate, onTxsUpdate) {
     if (!this.isActive() || !walletId) return;
 
-    // 이전 리스너들 해제
     this.unsubscribers.forEach(unsub => unsub());
     this.unsubscribers = [];
 
-    // 1) 지갑 기본 설정 스냅샷
     const unsubWallet = this.db.collection('wallets').doc(walletId).onSnapshot(doc => {
       if (doc.exists) {
         onWalletUpdate(doc.data());
@@ -108,7 +104,6 @@ class FirebaseSyncManager {
     }, err => console.error("지갑 정보 구독 에러", err));
     this.unsubscribers.push(unsubWallet);
 
-    // 2) 자산 목록 스냅샷
     const unsubAssets = this.db.collection('wallets').doc(walletId).collection('assets').onSnapshot(snap => {
       const assets = [];
       snap.forEach(doc => {
@@ -118,26 +113,22 @@ class FirebaseSyncManager {
     }, err => console.error("자산 목록 구독 에러", err));
     this.unsubscribers.push(unsubAssets);
 
-    // 3) 거래 내역 스냅샷
     const unsubTxs = this.db.collection('wallets').doc(walletId).collection('transactions').onSnapshot(snap => {
       const txs = [];
       snap.forEach(doc => {
         txs.push({ id: doc.id, ...doc.data() });
       });
-      // 정렬: 날짜 역순
       txs.sort((a, b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
       onTxsUpdate(txs);
     }, err => console.error("거래 내역 구독 에러", err));
     this.unsubscribers.push(unsubTxs);
   }
 
-  // 지갑 개설 시 Firestore에 마이그레이션 업로드
   async uploadInitialWallet(walletId, walletData, assets, txs) {
     if (!this.isActive()) return;
     try {
       const walletRef = this.db.collection('wallets').doc(walletId);
       
-      // 1) 지갑 문서 쓰기
       await walletRef.set({
         walletName: walletData.walletName,
         status: walletData.status,
@@ -149,7 +140,6 @@ class FirebaseSyncManager {
         createdAt: new Date().toISOString()
       });
 
-      // 2) 자산 목록 쓰기
       const assetPromises = assets.map(a => {
         return walletRef.collection('assets').doc(a.id).set({
           userId: a.userId,
@@ -165,7 +155,6 @@ class FirebaseSyncManager {
       });
       await Promise.all(assetPromises);
 
-      // 3) 거래 내역 쓰기
       const txPromises = txs.map(t => {
         return walletRef.collection('transactions').doc(t.id).set({
           userId: t.userId,
@@ -189,7 +178,6 @@ class FirebaseSyncManager {
     }
   }
 
-  // 실시간 단일 데이터 쓰기/수정/삭제 헬퍼
   async saveDocument(walletId, collectionName, docId, data) {
     if (!this.isActive() || !walletId) return;
     try {
@@ -224,7 +212,6 @@ class JointWalletStore {
     this.listeners = [];
     this.syncManager = new FirebaseSyncManager();
 
-    // 시작 시 Firebase 동기화 연동이 선언되어 있다면 기동
     if (this.data.firebaseConfig) {
       const initialized = this.syncManager.init(this.data.firebaseConfig);
       if (initialized && this.data.walletId) {
@@ -264,15 +251,18 @@ class JointWalletStore {
   }
 
   reset() {
-    // Firebase 동기화 상태 해제
     this.syncManager.disconnect();
     this.data = JSON.parse(JSON.stringify(INITIAL_DATA));
     this._save();
   }
 
+  // --- 기기 고유의 역할 식별정보 반환 헬퍼 ---
+  getMyUserId() {
+    return this.data.myUserId;
+  }
+
   // --- Firebase 동기화 설정 및 제어 메소드 ---
   
-  // 파이어베이스 설정 등록/업데이트
   setupFirebase(config) {
     if (!config) {
       this.syncManager.disconnect();
@@ -285,16 +275,13 @@ class JointWalletStore {
     const success = this.syncManager.init(config);
     if (success) {
       this.data.firebaseConfig = config;
-      // 아직 연동된 지갑 ID가 없다면 새로 생성 준비
       if (!this.data.walletId) {
         this.data.walletId = `wallet_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       }
       this._save();
       
-      // 동기화 구독 작동
       this._startFirebaseSync();
 
-      // 만약 방장으로 가동 중(초대 코드 있음)이라면 기존 로컬 데이터를 즉시 클라우드로 동기화 업로드
       if (this.data.status === 'active' || this.data.status === 'waiting_invitation') {
         this.syncManager.uploadInitialWallet(
           this.data.walletId, 
@@ -310,13 +297,11 @@ class JointWalletStore {
     }
   }
 
-  // 실시간 리스너 작동 및 동적 바인딩
   _startFirebaseSync() {
     if (!this.syncManager.isActive() || !this.data.walletId) return;
 
     this.syncManager.subscribe(
       this.data.walletId,
-      // 1) 지갑 정보 갱신
       (walletMeta) => {
         this.data.walletName = walletMeta.walletName;
         this.data.status = walletMeta.status;
@@ -327,12 +312,10 @@ class JointWalletStore {
         this.data.settings = walletMeta.settings;
         this._save();
       },
-      // 2) 자산 정보 갱신
       (assets) => {
         this.data.assets = assets;
         this._save();
       },
-      // 3) 거래 목록 갱신
       (txs) => {
         this.data.transactions = txs;
         this._save();
@@ -343,17 +326,18 @@ class JointWalletStore {
   // --- 메인 론칭 제어 트리거 ---
   
   createWallet(creatorName = "동글이") {
+    this.data.myUserId = "user_a"; // 개설한 폰의 세션 역할을 방장(User A)으로 락온
     this.data.users.A.name = creatorName;
     this.data.status = "waiting_invitation";
     this.regenerateInvitation();
 
-    // Firebase 연동 상태라면 Firestore에 즉시 반영
     if (this.syncManager.isActive()) {
       this.syncManager.uploadInitialWallet(this.data.walletId, this.data, this.data.assets, this.data.transactions);
     }
   }
 
   joinAsPartner(partnerName = "몽글이") {
+    this.data.myUserId = "user_b"; // 참여한 폰의 세션 역할을 참여자(User B)로 락온
     this.data.users.B.name = partnerName;
     this.data.status = "waiting_invitation";
     this._save();
@@ -386,15 +370,14 @@ class JointWalletStore {
     }
   }
 
-  // 초대 코드 연동 (Firestore 클라우드 뒤지기 추가)
   async acceptInvitation(code) {
     const cleanCode = code.trim().toUpperCase();
     const storedCode = (this.data.invitationCode || "").trim().toUpperCase();
 
     console.log("초대 코드 검증 시도:", { 입력값: cleanCode, 저장된값: storedCode });
 
-    // 1) 로컬 시뮬레이터 우선 매칭 (또는 동일 스토리지 공유 시)
     if (storedCode && storedCode === cleanCode) {
+      this.data.myUserId = "user_b"; // 로컬 매칭 시에도 참여자 역할로 확정 락온
       this.data.status = 'active';
       this._save();
 
@@ -404,7 +387,6 @@ class JointWalletStore {
       return true;
     }
 
-    // 2) Firebase 활성화 상태라면, Firestore 서버에서 해당 초대코드를 지닌 지갑 탐색 매칭
     if (this.syncManager.isActive()) {
       try {
         console.log("Firestore에서 초대 코드로 지갑 찾는 중...", cleanCode);
@@ -419,8 +401,8 @@ class JointWalletStore {
           
           this.data.walletId = matchedWalletId;
           this.data.status = 'active';
+          this.data.myUserId = "user_b"; // 서버 연동 수락 성공 시 B유저 역할로 락온
           
-          // B유저 정보에 내 이름 업데이트
           const dbData = matchedDoc.data();
           const dbUsers = dbData.users || {};
           if (dbUsers.B) {
@@ -456,6 +438,7 @@ class JointWalletStore {
     this.data.transactions = [];
     this.data.assets = this.data.assets.filter(a => a.userId === 'user_a');
     this.data.walletId = null;
+    this.data.myUserId = null; // 기기 역할 해제
     this._save();
   }
 
@@ -900,7 +883,6 @@ class JointWalletStore {
 
       this._save();
 
-      // 만약 파이어베이스가 가동 중이라면 대량 업로드
       if (this.syncManager.isActive()) {
         this.syncManager.uploadInitialWallet(this.data.walletId, this.data, this.data.assets, this.data.transactions);
       }
