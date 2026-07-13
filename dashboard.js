@@ -203,7 +203,7 @@ export function renderLandingScreen(userId, container) {
 
         <div class="cute-card" style="border: 1px solid var(--color-border); padding: 20px; background: #FFFFFF; margin-bottom:16px;">
           <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">사용할 닉네임</label>
-          <input type="text" class="cute-input" id="create-user-name" value="동글이" placeholder="이름을 입력하세요" style="margin-bottom: 14px;">
+          <input type="text" class="cute-input" id="create-user-name" placeholder="닉네임 입력" style="margin-bottom: 14px;">
 
           <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">개인 비밀번호 (숫자 4자리)</label>
           <input type="password" class="cute-input" id="create-user-pin" placeholder="숫자 4자리 입력" maxlength="4" pattern="[0-8]*" inputmode="numeric" style="text-align: center; font-size:1.2rem; letter-spacing:8px;">
@@ -246,7 +246,7 @@ export function renderLandingScreen(userId, container) {
 
         <div class="cute-card" style="border: 1px solid var(--color-border); padding: 16px 20px; background: #FFFFFF; margin-bottom:14px;">
           <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">사용할 닉네임</label>
-          <input type="text" class="cute-input" id="join-user-name" value="몽글이" placeholder="이름을 입력하세요" style="margin-bottom: 12px;">
+          <input type="text" class="cute-input" id="join-user-name" placeholder="닉네임 입력" style="margin-bottom: 12px;">
 
           <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">초대 코드</label>
           <input type="text" class="cute-input" id="join-invite-code" placeholder="SWEET-XXXXXX" style="text-align: center; text-transform: uppercase; font-weight:700; margin-bottom: 12px;">
@@ -1435,6 +1435,13 @@ function renderCategoriesManagementScreen(userId, container) {
   const categories = store.getCategories();
   
   container.innerHTML = `
+// 📁 카테고리 관리 모달 뷰포트 (순수 이모지 커스텀 선택 및 수정 기능)
+export function renderCategoryModal(userId, container) {
+  const categories = store.getCategories();
+  
+  let selectedEmoji = "🎈";
+
+  container.innerHTML = `
     <div class="cute-card">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom: 16px;">
         <button class="cute-btn neutral cute-btn-sm" id="btn-back-to-txs" style="padding:4px 8px;">‹ 뒤로</button>
@@ -1442,24 +1449,102 @@ function renderCategoriesManagementScreen(userId, container) {
       </div>
       
       <p style="font-size:0.8rem; color:var(--color-text-light); margin-bottom:16px;">
-        원하는 카테고리를 만들어서 가계부를 기록해 보세요. (최대 10개까지 가능, 현재: ${categories.length}/10)
+        카테고리의 <strong>아이콘(이모지)</strong>을 클릭하면 다른 이모지로 즉시 변경할 수 있습니다. (최대 10개, 현재: ${categories.length}/10)
       </p>
 
-      <form id="form-add-category" style="background:#F2F4F6; padding:14px; border-radius:var(--border-radius-md); margin-bottom:20px;">
-        <div style="display:grid; grid-template-columns: 3fr 1fr; gap:8px;">
-          <div>
-            <label class="cute-label">새 카테고리 이름</label>
-            <input type="text" class="cute-input" id="new-cat-name" placeholder="예: 구독료, 데이트" style="margin-bottom:0;" required>
+      <form id="form-add-category" style="background:#F2F4F6; padding:12px; border-radius:var(--border-radius-md); margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <!-- 이모지 선택 버튼 -->
+          <button type="button" id="btn-add-cat-emoji" style="width:42px; height:42px; border-radius:50%; border:none; font-size:1.35rem; display:flex; align-items:center; justify-content:center; background-color:#E9ECEF; color:var(--color-text); cursor:pointer; transition:transform 0.1s; box-shadow:0px 2px 4px rgba(0,0,0,0.05);" title="아이콘 변경">
+            ${selectedEmoji}
+          </button>
+          
+          <div style="flex:1;">
+            <input type="text" class="cute-input" id="new-cat-name" placeholder="카테고리 이름 (예: 데이트, 구독료)" style="margin-bottom:0; height:42px;" required>
           </div>
-          <div style="display:flex; align-items:flex-end;">
-            <button type="submit" class="cute-btn primary" id="btn-submit-cat" style="width:100%; height:44px; padding:0;">추가</button>
-          </div>
+          
+          <button type="submit" class="cute-btn primary" id="btn-submit-cat" style="height:42px; padding:0 16px; min-width:60px;">추가</button>
         </div>
       </form>
 
       <div id="categories-list-box"></div>
     </div>
   `;
+
+  // 🎨 이모지 픽커 공용 팝업 헬퍼 (컬러 선택 걷어냄)
+  function showEmojiPicker(currentEmoji, onConfirm) {
+    const emojis = ["🍔", "🧼", "🚌", "🎬", "🎁", "🛒", "💊", "🏠", "👕", "✈️", "☕", "💡", "💰", "🐾", "👶", "🎈"];
+    
+    let activeEmoji = currentEmoji;
+
+    const picker = document.createElement('div');
+    picker.style = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.45); display: flex; align-items: center;
+      justify-content: center; z-index: 10008; padding: 20px;
+      backdrop-filter: blur(4px);
+    `;
+
+    picker.innerHTML = `
+      <div class="cute-card" style="width:100%; max-width:275px; background:white; text-align:center; padding:20px; animation: bounce-cute 0.2s forwards; margin-bottom:0;">
+        <h4 style="font-weight:700; font-size:1.05rem; margin-bottom:12px; color:var(--color-text);">카테고리 아이콘 선택</h4>
+        
+        <!-- 프리뷰 아바타 -->
+        <div style="display:flex; justify-content:center; margin-bottom:16px;">
+          <div id="picker-preview" style="width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.75rem; background-color:#F2F4F6; border:1px solid var(--color-border);">
+            ${activeEmoji}
+          </div>
+        </div>
+
+        <!-- 이모지 그리드 -->
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; margin-bottom:20px;">
+          ${emojis.map(emo => `
+            <button type="button" class="picker-emoji-btn" data-emoji="${emo}" style="font-size:1.35rem; background:none; border:none; cursor:pointer; padding:6px; border-radius:8px; transition:background 0.1s; ${emo === activeEmoji ? 'background-color:#E9ECEF;' : ''}">
+              ${emo}
+            </button>
+          `).join('')}
+        </div>
+
+        <div style="display:flex; gap:6px;">
+          <button type="button" class="cute-btn primary cute-btn-sm" id="btn-picker-confirm" style="flex:1;">확인</button>
+          <button type="button" class="cute-btn neutral cute-btn-sm" id="btn-picker-close" style="flex:1;">취소</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(picker);
+
+    const preview = picker.querySelector('#picker-preview');
+
+    // 이모지 선택 리스너
+    picker.querySelectorAll('.picker-emoji-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        picker.querySelectorAll('.picker-emoji-btn').forEach(b => b.style.backgroundColor = 'transparent');
+        activeEmoji = e.currentTarget.getAttribute('data-emoji');
+        e.currentTarget.style.backgroundColor = '#E9ECEF';
+        preview.textContent = activeEmoji;
+      });
+    });
+
+    // 최종 컨펌
+    picker.querySelector('#btn-picker-confirm').addEventListener('click', () => {
+      onConfirm(activeEmoji);
+      picker.remove();
+    });
+
+    picker.querySelector('#btn-picker-close').addEventListener('click', () => {
+      picker.remove();
+    });
+  }
+
+  // 등록 폼 이모지 피커 트리거
+  const formEmojiBtn = container.querySelector('#btn-add-cat-emoji');
+  formEmojiBtn.addEventListener('click', () => {
+    showEmojiPicker(selectedEmoji, (emoji) => {
+      selectedEmoji = emoji;
+      formEmojiBtn.textContent = emoji;
+    });
+  });
 
   const goBack = () => {
     txSubViewState[userId] = { mode: 'list' };
@@ -1485,17 +1570,37 @@ function renderCategoriesManagementScreen(userId, container) {
 
     listBox.innerHTML = cats.map(c => {
       const isDefaultEtc = c.id === 'etc';
+      
       return `
-        <div class="item-row" style="padding:10px 0;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:1.25rem;">${c.emoji}</span>
-            <span style="font-weight:600; font-size:0.9rem;">${c.name}</span>
-            ${isDefaultEtc ? `<span style="font-size:0.75rem; color:var(--color-text-muted);">(기본기타)</span>` : ''}
+        <div class="item-row" style="padding:12px 0; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <!-- 순수 이모지 노출 (클릭해서 변경 가능) -->
+            <span class="cat-avatar-btn" data-id="${c.id}" data-emoji="${c.emoji}" style="font-size:1.45rem; cursor:pointer; padding: 4px; border-radius: 8px; transition: background 0.15s;" title="아이콘 변경" onmouseover="this.style.backgroundColor='#F2F4F6'" onmouseout="this.style.backgroundColor='transparent'">
+              ${c.emoji}
+            </span>
+            
+            <span style="font-weight:600; font-size:0.92rem; color:var(--color-text);">${c.name}</span>
+            ${isDefaultEtc ? `<span style="font-size:0.72rem; color:var(--color-text-muted);">(기본 카테고리)</span>` : ''}
           </div>
-          ${isDefaultEtc ? '' : `<button class="cute-btn cute-btn-sm neutral btn-delete-cat" data-id="${c.id}" style="color:var(--color-red); padding:4px 8px;">삭제</button>`}
+          ${isDefaultEtc ? '' : `<button class="cute-btn cute-btn-sm neutral btn-delete-cat" data-id="${c.id}" style="color:var(--color-red); padding:4px 8px; border:none; font-size:0.75rem;">삭제</button>`}
         </div>
       `;
     }).join('');
+
+    // 리스트 내 이모지 클릭 시 변경 핸들러
+    listBox.querySelectorAll('.cat-avatar-btn').forEach(avatar => {
+      avatar.addEventListener('click', (e) => {
+        const target = e.currentTarget;
+        const id = target.getAttribute('data-id');
+        const currentEmoji = target.getAttribute('data-emoji');
+
+        showEmojiPicker(currentEmoji, (newEmoji) => {
+          store.updateCategory(id, { emoji: newEmoji });
+          showToast(container, "아이콘이 변경되었습니다.");
+          renderCatList();
+        });
+      });
+    });
 
     listBox.querySelectorAll('.btn-delete-cat').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1518,15 +1623,16 @@ function renderCategoriesManagementScreen(userId, container) {
   container.querySelector('#form-add-category').addEventListener('submit', (e) => {
     e.preventDefault();
     const name = container.querySelector('#new-cat-name').value;
-    const emoji = "📁";
 
-    const colors = ["#F04452", "#FFB300", "#3182F6", "#7B3FE4", "#00D282"];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-    const res = store.addCategory(name, emoji, randomColor);
+    const res = store.addCategory(name, selectedEmoji);
     if (res.success) {
       showToast(container, "새 카테고리가 추가되었습니다.");
       e.target.reset();
+      
+      // 상태 초기화
+      selectedEmoji = "🎈";
+      formEmojiBtn.textContent = selectedEmoji;
+
       renderCatList();
     } else {
       alert(res.message);
