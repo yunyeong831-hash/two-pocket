@@ -1414,6 +1414,7 @@ export function renderMyTab(userId, container) {
 
   // 모바일 1인 기기 뷰포트로 각각 접속할 수 있는 실주소 계산
   const baseLink = window.location.origin + window.location.pathname;
+  const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
   container.innerHTML = `
     <!-- 1. 공유 지갑 정보 -->
@@ -1437,6 +1438,7 @@ export function renderMyTab(userId, container) {
       </div>
     </div>
 
+    ${isLocalEnv ? `
     <!-- 2. Firebase 실시간 무선 동기화 셋팅 영역 -->
     <div class="setting-section-title">실시간 무선 동기화 (Firebase Cloud)</div>
     <div class="cute-card" style="border-color: ${isFirebaseSyncActive ? 'var(--color-green)' : 'var(--color-border)'}">
@@ -1475,6 +1477,7 @@ export function renderMyTab(userId, container) {
       </div>
       ` : ''}
     </div>
+    ` : ''}
 
     <!-- 3. 지갑 관리 및 데이터 백업 -->
     <div class="setting-section-title">데이터 및 연동 관리</div>
@@ -1525,51 +1528,51 @@ export function renderMyTab(userId, container) {
 
   // --- 이벤트 리스너 바인딩 ---
 
-  // Firebase 활성화 버튼 리스너
-  const txtConfig = container.querySelector(`#textarea-firebase-config-${userId}`);
-  
-  container.querySelector(`#btn-save-firebase-${userId}`).addEventListener('click', () => {
-    const rawVal = txtConfig.value.trim();
-    if (!rawVal) {
-      alert("Firebase Config JSON 코드를 입력해 주세요.");
-      return;
-    }
-    try {
-      const parsedConfig = JSON.parse(rawVal);
-      const res = store.setupFirebase(parsedConfig);
-      if (res.success) {
-        alert(res.message);
-        window.location.reload();
-      } else {
-        alert(res.message);
+  // 로컬 환경일 때만 Firebase 셋팅 관련 버튼 리스너 바인딩
+  if (isLocalEnv) {
+    const txtConfig = container.querySelector(`#textarea-firebase-config-${userId}`);
+    
+    container.querySelector(`#btn-save-firebase-${userId}`).addEventListener('click', () => {
+      const rawVal = txtConfig.value.trim();
+      if (!rawVal) {
+        alert("Firebase Config JSON 코드를 입력해 주세요.");
+        return;
       }
-    } catch (e) {
-      alert("올바른 JSON 형식이 아닙니다. 입력값을 확인해 주세요.");
-    }
-  });
+      try {
+        const parsedConfig = JSON.parse(rawVal);
+        const res = store.setupFirebase(parsedConfig);
+        if (res.success) {
+          alert(res.message);
+          window.location.reload();
+        } else {
+          alert(res.message);
+        }
+      } catch (e) {
+        alert("올바른 JSON 형식이 아닙니다. 입력값을 확인해 주세요.");
+      }
+    });
 
-  // Firebase 연동 해제 버튼 리스너
-  container.querySelector(`#btn-clear-firebase-${userId}`).addEventListener('click', () => {
-    if (confirm("클라우드 실시간 동기화를 끄고 로컬 모드로 복귀하시겠습니까? (로컬의 데이터는 유지됩니다)")) {
-      store.setupFirebase(null);
-      alert("실시간 동기화가 해제되고 기기 로컬 모드로 전환되었습니다.");
-      window.location.reload();
-    }
-  });
+    container.querySelector(`#btn-clear-firebase-${userId}`).addEventListener('click', () => {
+      if (confirm("클라우드 실시간 동기화를 끄고 로컬 모드로 복귀하시겠습니까? (로컬의 데이터는 유지됩니다)")) {
+        store.setupFirebase(null);
+        alert("실시간 동기화가 해제되고 기기 로컬 모드로 전환되었습니다.");
+        window.location.reload();
+      }
+    });
 
-  // 데모 계정 자동 입력 버튼 리스너 (사용자의 즉석 테스트 편의성)
-  container.querySelector(`#btn-fill-demo-firebase-${userId}`).addEventListener('click', () => {
-    const demoConfig = {
-      apiKey: "AIzaSyAs1-U90kDemoTwoPocketCloudKeyMockUp",
-      authDomain: "two-pocket-demo.firebaseapp.com",
-      projectId: "two-pocket-demo",
-      storageBucket: "two-pocket-demo.appspot.com",
-      messagingSenderId: "987654321012",
-      appId: "1:987654321012:web:demo123456789abcde"
-    };
-    txtConfig.value = JSON.stringify(demoConfig, null, 2);
-    showToast(container, "데모 계정 설정이 임시 작성되었습니다.");
-  });
+    container.querySelector(`#btn-fill-demo-firebase-${userId}`).addEventListener('click', () => {
+      const demoConfig = {
+        apiKey: "AIzaSyAs1-U90kDemoTwoPocketCloudKeyMockUp",
+        authDomain: "two-pocket-demo.firebaseapp.com",
+        projectId: "two-pocket-demo",
+        storageBucket: "two-pocket-demo.appspot.com",
+        messagingSenderId: "987654321012",
+        appId: "1:987654321012:web:demo123456789abcde"
+      };
+      txtConfig.value = JSON.stringify(demoConfig, null, 2);
+      showToast(container, "데모 계정 설정이 임시 작성되었습니다.");
+    });
+  }
 
   // 투포켓 코드 복사 버튼 리스너
   container.querySelector('#btn-copy-wallet-code-my').addEventListener('click', () => {
