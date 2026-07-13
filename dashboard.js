@@ -1433,12 +1433,6 @@ function renderTxsMainScreen(userId, container) {
 // ⚙️ [거래 - 카테고리 편집 및 추가 화면]
 function renderCategoriesManagementScreen(userId, container) {
   const categories = store.getCategories();
-  
-  container.innerHTML = `
-// 📁 카테고리 관리 모달 뷰포트 (순수 이모지 커스텀 선택 및 수정 기능)
-export function renderCategoryModal(userId, container) {
-  const categories = store.getCategories();
-  
   let selectedEmoji = "🎈";
 
   container.innerHTML = `
@@ -1474,7 +1468,6 @@ export function renderCategoryModal(userId, container) {
   // 🎨 이모지 픽커 공용 팝업 헬퍼 (컬러 선택 걷어냄)
   function showEmojiPicker(currentEmoji, onConfirm) {
     const emojis = ["🍔", "🧼", "🚌", "🎬", "🎁", "🛒", "💊", "🏠", "👕", "✈️", "☕", "💡", "💰", "🐾", "👶", "🎈"];
-    
     let activeEmoji = currentEmoji;
 
     const picker = document.createElement('div');
