@@ -13,11 +13,11 @@ const DEFAULT_FIREBASE_CONFIG = {
 };
 
 const DEFAULT_CATEGORIES = [
-  { id: "food", name: "식비", emoji: "🍔", color: "#F04452" },
-  { id: "living", name: "생활", emoji: "🧼", color: "#FFB300" },
-  { id: "trans", name: "교통", emoji: "🚌", color: "#3182F6" },
-  { id: "culture", name: "문화/여가", emoji: "🎬", color: "#7B3FE4" },
-  { id: "etc", name: "기타", emoji: "🎈", color: "#00D282" }
+  { id: "food", name: "식비", emoji: "🍔" },
+  { id: "living", name: "생활", emoji: "🧼" },
+  { id: "trans", name: "교통", emoji: "🚌" },
+  { id: "culture", name: "문화/여가", emoji: "🎬" },
+  { id: "etc", name: "기타", emoji: "🎈" }
 ];
 
 const INITIAL_DATA = {
@@ -558,7 +558,7 @@ class JointWalletStore {
     return this.data.categories || DEFAULT_CATEGORIES;
   }
 
-  addCategory(name, emoji = "🎈", color = "#3182F6") {
+  addCategory(name, emoji = "🎈") {
     const current = this.getCategories();
     if (current.length >= 10) {
       return { success: false, message: "카테고리는 최대 10개까지만 만들 수 있어요." };
@@ -574,8 +574,7 @@ class JointWalletStore {
     const newCat = {
       id: `cat_${Date.now()}`,
       name: cleanName,
-      emoji,
-      color
+      emoji
     };
 
     this.data.categories.push(newCat);
@@ -586,6 +585,23 @@ class JointWalletStore {
     }
 
     return { success: true, category: newCat };
+  }
+
+  updateCategory(catId, fields) {
+    const idx = this.data.categories.findIndex(c => c.id === catId);
+    if (idx !== -1) {
+      this.data.categories[idx] = {
+        ...this.data.categories[idx],
+        ...fields
+      };
+      this._save();
+
+      if (this.syncManager.isActive()) {
+        this.syncManager.updateWalletMeta(this.data.walletId, { categories: this.data.categories });
+      }
+      return { success: true };
+    }
+    return { success: false, message: "카테고리를 찾을 수 없습니다." };
   }
 
   deleteCategory(catId) {
