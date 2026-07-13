@@ -132,11 +132,10 @@ export function showFirebaseConfigModal(container) {
   });
 }
 
-// 🚀 시작 전 메인 랜딩 페이지 렌더러 (투포켓 전용 브랜딩)
-export function renderLandingScreen(userId, container) {
-  const isA = userId === 'user_a';
-  const defaultName = isA ? "동글이" : "몽글이";
+// 🚀 시작 전 메인 랜딩 페이지 렌더러 (투포켓 전용 브랜딩 - 3단계 UX & PIN 번호 개편)
+let landingStepState = 'main'; // 'main' | 'create' | 'join'
 
+export function renderLandingScreen(userId, container) {
   const isSyncActive = store.syncManager.isActive();
   const syncLinkText = isSyncActive 
     ? "🟢 실시간 동기화(Firebase) 설정 변경" 
@@ -152,66 +151,152 @@ export function renderLandingScreen(userId, container) {
        </div>`
     : '';
 
-  container.innerHTML = `
-    <div style="text-align: center; padding: 30px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
-      <!-- 투포켓 시그니처 엠블럼 -->
-      <div style="font-size: 4rem; margin-bottom: 16px; filter: drop-shadow(0px 8px 16px rgba(49, 130, 246, 0.15)); animation: pulse-cute 2s infinite alternate;">
-        👛
-      </div>
-      
-      <h2 class="paperlogy-title" style="font-size: 2.1rem; color: var(--color-text); margin-bottom: 6px;">
-        투포켓
-      </h2>
-      <p class="paperlogy-sub" style="font-size: 0.92rem; color: var(--color-text-light); line-height: 1.6; margin-bottom: 24px;">
-        주머니는 각자 따로, 관리는 같이!<br>
-        복잡한 통장합치기 없이, 우리 둘의 미래 자산을 키워나가요.
-      </p>
+  // 1️⃣ [Step 1: 메인] 개설하기 / 참가하기 큰 버튼 2개만 노출
+  if (landingStepState === 'main') {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 30px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+        <div style="font-size: 4rem; margin-bottom: 16px; filter: drop-shadow(0px 8px 16px rgba(49, 130, 246, 0.15)); animation: pulse-cute 2s infinite alternate;">
+          👛
+        </div>
+        
+        <h2 class="paperlogy-title" style="font-size: 2.1rem; color: var(--color-text); margin-bottom: 6px;">
+          투포켓
+        </h2>
+        <p class="paperlogy-sub" style="font-size: 0.92rem; color: var(--color-text-light); line-height: 1.6; margin-bottom: 24px;">
+          주머니는 각자 따로, 관리는 같이!<br>
+          복잡한 통장합치기 없이, 우리 둘의 미래 자산을 키워나가요.
+        </p>
 
-      <!-- 2인 뷰포트 모두 동일한 닉네임 기입 및 루트 선택 카드 노출 -->
-      <div class="cute-card" style="width: 100%; border: 1px solid var(--color-border); padding: 20px; background: #FFFFFF; text-align: left; margin-bottom: 12px;">
-        <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">사용할 닉네임</label>
-        <input type="text" class="cute-input" id="landing-user-name-${userId}" value="${defaultName}" placeholder="이름을 입력해 주세요" style="margin-bottom: 16px;" required>
+        <div class="cute-card" style="width: 100%; border: 1px solid var(--color-border); padding: 24px; background: #FFFFFF; text-align: center; margin-bottom: 12px; display:flex; flex-direction:column; gap:10px;">
+          <button class="cute-btn primary" id="btn-go-create" style="width: 100%; padding: 14px 20px; font-size:1rem;">새 투포켓 지갑 개설하기</button>
+          <button class="cute-btn secondary" id="btn-go-join" style="width: 100%; padding: 14px 20px; font-size:1rem; background-color: var(--color-green-bg); color: var(--color-green); border:none;">초대코드로 포켓 연결하기</button>
+        </div>
 
-        <div style="display:flex; flex-direction:column; gap:8px;">
-          <button class="cute-btn primary" id="btn-landing-create-${userId}" style="width: 100%;">새 투포켓 지갑 개설하기</button>
-          <button class="cute-btn secondary" id="btn-landing-join-${userId}" style="width: 100%; background-color: var(--color-green-bg); color: var(--color-green); border:none;">초대코드로 포켓 연결하기</button>
+        ${localSettingHtml}
+
+        <div style="font-size: 0.72rem; color: var(--color-text-muted);">
+          🔒 데이터는 기기 브라우저에 투명하게 보관됩니다.
         </div>
       </div>
-
-      ${localSettingHtml}
-
-      <div style="font-size: 0.72rem; color: var(--color-text-muted);">
-        🔒 데이터는 기기 브라우저에 투명하게 보관됩니다.
-      </div>
-    </div>
-  `;
-
-  if (!document.getElementById('style-landing-animation')) {
-    const style = document.createElement('style');
-    style.id = 'style-landing-animation';
-    style.innerHTML = `
-      @keyframes pulse-cute {
-        0% { transform: scale(1) translateY(0); }
-        100% { transform: scale(1.05) translateY(-5px); }
-      }
     `;
-    document.head.appendChild(style);
+
+    container.querySelector('#btn-go-create').addEventListener('click', () => {
+      landingStepState = 'create';
+      renderLandingScreen(userId, container);
+    });
+
+    container.querySelector('#btn-go-join').addEventListener('click', () => {
+      landingStepState = 'join';
+      renderLandingScreen(userId, container);
+    });
+  }
+  
+  // 2️⃣ [Step 2: 개설] 방장 닉네임 및 PIN번호 4자리 설정
+  else if (landingStepState === 'create') {
+    container.innerHTML = `
+      <div style="padding: 24px 20px; display: flex; flex-direction: column; height: 100%; justify-content: center;">
+        <div style="font-size: 2.5rem; text-align:center; margin-bottom:12px;">👑</div>
+        <h3 class="cute-card-title" style="font-size:1.4rem; text-align:center; margin-bottom:8px;">투포켓 지갑 개설</h3>
+        <p style="font-size:0.82rem; color:var(--color-text-light); text-align:center; line-height:1.5; margin-bottom:24px;">
+          가계부방을 개설하고 파트너를 초대합니다.<br>비상금 프라이버시 보호용 핀번호를 설정하세요.
+        </p>
+
+        <div class="cute-card" style="border: 1px solid var(--color-border); padding: 20px; background: #FFFFFF; margin-bottom:16px;">
+          <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">사용할 닉네임</label>
+          <input type="text" class="cute-input" id="create-user-name" value="동글이" placeholder="이름을 입력하세요" style="margin-bottom: 14px;">
+
+          <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">개인 비밀번호 (숫자 4자리)</label>
+          <input type="password" class="cute-input" id="create-user-pin" placeholder="숫자 4자리 입력" maxlength="4" pattern="[0-8]*" inputmode="numeric" style="text-align: center; font-size:1.2rem; letter-spacing:8px;">
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button class="cute-btn primary" id="btn-submit-create" style="width: 100%;">포켓 개설하고 코드 생성</button>
+          <button class="cute-btn neutral" id="btn-back-to-main" style="width: 100%;">이전으로 돌아가기</button>
+        </div>
+      </div>
+    `;
+
+    container.querySelector('#btn-submit-create').addEventListener('click', () => {
+      const name = container.querySelector('#create-user-name').value.trim() || "동글이";
+      const pin = container.querySelector('#create-user-pin').value.trim();
+
+      if (pin.length !== 4 || isNaN(Number(pin))) {
+        alert("비밀번호는 숫자 4자리로 정확히 입력해 주세요.");
+        return;
+      }
+
+      store.createWallet(name, pin);
+    });
+
+    container.querySelector('#btn-back-to-main').addEventListener('click', () => {
+      landingStepState = 'main';
+      renderLandingScreen(userId, container);
+    });
+  }
+  
+  // 3️⃣ [Step 3: 참여] 닉네임 + 초대코드 + PIN번호 원페이지 통합
+  else if (landingStepState === 'join') {
+    container.innerHTML = `
+      <div style="padding: 20px; display: flex; flex-direction: column; height: 100%; justify-content: center; overflow-y: auto;">
+        <div style="font-size: 2.5rem; text-align:center; margin-bottom:12px;">🔑</div>
+        <h3 class="cute-card-title" style="font-size:1.4rem; text-align:center; margin-bottom:8px;">포켓 참여 및 복원</h3>
+        <p style="font-size:0.82rem; color:var(--color-text-light); text-align:center; line-height:1.5; margin-bottom:20px;">
+          파트너가 공유해 준 초대코드를 입력하고 조인합니다.<br>사용할 닉네임과 내 전용 비밀번호를 정하세요.
+        </p>
+
+        <div class="cute-card" style="border: 1px solid var(--color-border); padding: 16px 20px; background: #FFFFFF; margin-bottom:14px;">
+          <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">사용할 닉네임</label>
+          <input type="text" class="cute-input" id="join-user-name" value="몽글이" placeholder="이름을 입력하세요" style="margin-bottom: 12px;">
+
+          <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">초대 코드</label>
+          <input type="text" class="cute-input" id="join-invite-code" placeholder="SWEET-XXXXXX" style="text-align: center; text-transform: uppercase; font-weight:700; margin-bottom: 12px;">
+
+          <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">개인 비밀번호 (숫자 4자리)</label>
+          <input type="password" class="cute-input" id="join-user-pin" placeholder="숫자 4자리 입력" maxlength="4" pattern="[0-8]*" inputmode="numeric" style="text-align: center; font-size:1.2rem; letter-spacing:8px;">
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <button class="cute-btn primary" id="btn-submit-join" style="width: 100%;">포켓 연결 및 복원</button>
+          <button class="cute-btn neutral" id="btn-back-to-main-join" style="width: 100%;">이전으로 돌아가기</button>
+        </div>
+      </div>
+    `;
+
+    container.querySelector('#btn-submit-join').addEventListener('click', () => {
+      const name = container.querySelector('#join-user-name').value.trim() || "몽글이";
+      const code = container.querySelector('#join-invite-code').value.trim().toUpperCase();
+      const pin = container.querySelector('#join-user-pin').value.trim();
+
+      if (!code) {
+        alert("초대 코드를 입력해 주세요.");
+        return;
+      }
+      if (pin.length !== 4 || isNaN(Number(pin))) {
+        alert("비밀번호는 숫자 4자리로 정확히 입력해 주세요.");
+        return;
+      }
+
+      // acceptInvitation 시에 신규 닉네임과 핀정보(partnerName, partnerPin)를 함께 동적 주입
+      store.acceptInvitation(code, null, null, name, pin).then(res => {
+        if (res.status === 'success') {
+          showToast(container, "성공적으로 지갑방에 연결되었습니다.");
+        } else if (res.status === 'require_role_choice') {
+          // 이미 기존에 생성 및 매칭 완료된 방일 때 역할 선택 복원 팝업으로 연계
+          showRoleChoiceModal(code, container, res.dbData);
+        } else {
+          showToast(container, "초대 코드가 유효하지 않습니다.");
+        }
+      });
+    });
+
+    container.querySelector('#btn-back-to-main-join').addEventListener('click', () => {
+      landingStepState = 'main';
+      renderLandingScreen(userId, container);
+    });
   }
 
-  const nameInput = container.querySelector(`#landing-user-name-${userId}`);
-
-  container.querySelector(`#btn-landing-create-${userId}`).addEventListener('click', () => {
-    const name = nameInput.value.trim() || "동글이";
-    store.createWallet(name);
-  });
-
-  container.querySelector(`#btn-landing-join-${userId}`).addEventListener('click', () => {
-    const name = nameInput.value.trim() || "몽글이";
-    store.joinAsPartner(name);
-  });
-
-  // 로컬 환경일 때만 파이어베이스 셋팅 모달 링크 리스너 작동
-  if (isLocalEnv) {
+  // 디버깅용 파이어베이스 설정 리스너 연결
+  if (isLocalEnv && container.querySelector('#btn-landing-go-firebase')) {
     container.querySelector('#btn-landing-go-firebase').addEventListener('click', () => {
       showFirebaseConfigModal(container);
     });
@@ -327,7 +412,7 @@ export function renderInvitationScreen(userId, container) {
   }
 }
 
-// 👑 가계부 복원 선택 다이얼로그 모달 모듈
+// 👑 가계부 복원 선택 다이얼로그 모달 모듈 (2단계 PIN 패스워드 검증 연계)
 function showRoleChoiceModal(code, container, dbData = null) {
   const nameA = (dbData && dbData.users && dbData.users.A && dbData.users.A.name) ? dbData.users.A.name : "동글이";
   const nameB = (dbData && dbData.users && dbData.users.B && dbData.users.B.name) ? dbData.users.B.name : "몽글이";
@@ -375,19 +460,77 @@ function showRoleChoiceModal(code, container, dbData = null) {
   }
 
   document.body.appendChild(modal);
-  
-  modal.querySelector('#btn-choice-a').addEventListener('click', () => {
-    store.acceptInvitation(code, 'user_a').then(() => {
-      modal.remove();
-      showToast(container, `${nameA}로 복원되었습니다.`);
+
+  // 🔒 2차 PIN 확인 서브 다이얼로그 호출 헬퍼
+  function askForPin(chosenRole, roleName) {
+    const pinModal = document.createElement('div');
+    pinModal.style = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.45); display: flex; align-items: center;
+      justify-content: center; z-index: 10000; padding: 20px;
+      backdrop-filter: blur(4px);
+    `;
+    
+    pinModal.innerHTML = `
+      <div class="cute-card" style="width: 100%; max-width: 310px; background: white; margin-bottom: 0; text-align: center; animation: bounce-cute 0.25s forwards;">
+        <div style="font-size: 2.2rem; margin-bottom: 6px;">🛡️</div>
+        <h4 style="margin-bottom: 4px; font-weight:700; font-size: 1.1rem; color:var(--color-text);">${roleName} 비밀번호 확인</h4>
+        <p style="font-size: 0.78rem; color: var(--color-text-light); line-height: 1.4; margin-bottom: 16px;">
+          정보 보호를 위해 설정하신 개인 비밀번호를 입력하세요.
+        </p>
+
+        <input type="password" class="cute-input" id="input-verify-pin" placeholder="비밀번호 4자리" maxlength="4" pattern="[0-8]*" inputmode="numeric" style="text-align: center; font-size:1.1rem; letter-spacing:6px; margin-bottom:12px;">
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button class="cute-btn primary cute-btn-sm" id="btn-pin-confirm" style="width: 100%;">비밀번호 확인</button>
+          <button class="cute-btn neutral cute-btn-sm" id="btn-pin-cancel" style="width: 100%;">취소</button>
+          
+          <button class="cute-btn neutral cute-btn-sm" id="btn-forgot-pin" style="font-size: 0.72rem; text-decoration: underline; background: transparent; border: none; color: var(--color-text-muted); padding: 4px 0; cursor: pointer;">
+            비밀번호를 분실하셨나요?
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(pinModal);
+
+    pinModal.querySelector('#btn-pin-confirm').addEventListener('click', () => {
+      const pin = pinModal.querySelector('#input-verify-pin').value.trim();
+      if (pin.length !== 4) {
+        alert("비밀번호는 숫자 4자리입니다.");
+        return;
+      }
+
+      store.acceptInvitation(code, chosenRole, pin).then(res => {
+        if (res.status === 'success') {
+          pinModal.remove();
+          modal.remove();
+          showToast(container, `${roleName}로 복원되었습니다.`);
+        } else if (res.status === 'pin_failed') {
+          alert("비밀번호가 일치하지 않습니다. 다시 입력해 주세요.");
+        } else {
+          alert("네트워크 통신 오류가 발생했습니다.");
+        }
+      });
     });
+
+    pinModal.querySelector('#btn-pin-cancel').addEventListener('click', () => {
+      pinModal.remove();
+    });
+
+    // 💡 비밀번호 분실 시 파트너 승인 복구 안내 바인딩
+    pinModal.querySelector('#btn-forgot-pin').addEventListener('click', () => {
+      const partnerRole = chosenRole === 'user_a' ? '몽글이' : '동글이';
+      alert(`[🔒 투포켓 비밀번호 찾기 안내]\n\n이메일이나 회원가입을 거치지 않는 무가입 구조이므로, 이미 로그인되어 정상 작동 중인 파트너(${partnerRole})의 스마트폰 가계부 앱 내 [마이] 탭에 접속하셔서 멤버 목록 옆의 [PIN 확인] 버튼을 누르시면, 본인의 4자리 비밀번호를 안전하게 확인하실 수 있습니다!`);
+    });
+  }
+
+  modal.querySelector('#btn-choice-a').addEventListener('click', () => {
+    askForPin('user_a', nameA);
   });
   
   modal.querySelector('#btn-choice-b').addEventListener('click', () => {
-    store.acceptInvitation(code, 'user_b').then(() => {
-      modal.remove();
-      showToast(container, `${nameB}로 복원되었습니다.`);
-    });
+    askForPin('user_b', nameB);
   });
   
   modal.querySelector('#btn-choice-cancel').addEventListener('click', () => {
@@ -1431,10 +1574,17 @@ export function renderMyTab(userId, container) {
         <div class="setting-info">
           <span class="setting-title">지갑 멤버 목록</span>
           <span class="setting-sub">
-            A: ${data.users.A.name} (관리자) <br>
-            B: ${data.status === 'active' ? data.users.B.name : '초대 대기 중'}
+            A: ${data.users.A.name} (관리자) ${!isA && data.status === 'active' ? `<button class="cute-btn cute-btn-sm secondary" id="btn-show-partner-pin" style="display:inline-block; font-size:0.65rem; padding: 2px 6px; margin-left: 6px; background-color: var(--color-pink-bg); color: var(--color-pink); border:none; vertical-align:middle;">PIN 확인</button>` : ''}<br>
+            B: ${data.status === 'active' ? `${data.users.B.name} ${isA ? `<button class="cute-btn cute-btn-sm secondary" id="btn-show-partner-pin" style="display:inline-block; font-size:0.65rem; padding: 2px 6px; margin-left: 6px; background-color: var(--color-green-bg); color: var(--color-green); border:none; vertical-align:middle;">PIN 확인</button>` : ''}` : '초대 대기 중'}
           </span>
         </div>
+      </div>
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-title">내 개인 비밀번호</span>
+          <span class="setting-sub">정보 복원(재로그인) 시 본인 확인을 위해 사용하는 4자리 PIN</span>
+        </div>
+        <button class="cute-btn cute-btn-sm secondary" id="btn-change-my-pin">변경</button>
       </div>
     </div>
 
@@ -1662,5 +1812,110 @@ export function renderMyTab(userId, container) {
       store.reset();
       showToast(container, "가계부 데이터가 완전히 초기화되었습니다.");
     }
+  });
+
+  // 🔒 1) 상대방 핀번호 확인/원격 초기화 리스너
+  const showPartnerPinBtn = container.querySelector('#btn-show-partner-pin');
+  if (showPartnerPinBtn) {
+    showPartnerPinBtn.addEventListener('click', () => {
+      const partnerRole = isA ? 'user_b' : 'user_a';
+      const res = store.resetPartnerPin(partnerRole); // PIN 조회
+      
+      const pinAlertModal = document.createElement('div');
+      pinAlertModal.style = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.45); display: flex; align-items: center;
+        justify-content: center; z-index: 10005; padding: 20px;
+        backdrop-filter: blur(4px);
+      `;
+      
+      pinAlertModal.innerHTML = `
+        <div class="cute-card" style="width: 100%; max-width: 310px; background: white; margin-bottom: 0; text-align: center; animation: bounce-cute 0.25s forwards;">
+          <div style="font-size: 2.2rem; margin-bottom: 6px;">🔑</div>
+          <h4 style="margin-bottom: 4px; font-weight:700; font-size: 1.1rem; color:var(--color-text);">${partnerName} PIN 확인</h4>
+          <p style="font-size: 0.8rem; color: var(--color-text-light); line-height: 1.4; margin-bottom: 20px;">
+            상대방의 현재 개인 비밀번호는 <br>
+            <strong style="font-size:1.3rem; color:var(--color-blue); letter-spacing:2px; display:block; margin: 8px 0;">${res.pin}</strong> 입니다.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button class="cute-btn secondary cute-btn-sm" id="btn-partner-pin-reset" style="width: 100%; background-color: var(--color-red-bg); color:var(--color-red); border:none;">0000으로 비밀번호 초기화</button>
+            <button class="cute-btn neutral cute-btn-sm" id="btn-partner-pin-close" style="width: 100%;">닫기</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(pinAlertModal);
+      
+      pinAlertModal.querySelector('#btn-partner-pin-reset').addEventListener('click', () => {
+        if (confirm(`${partnerName}님의 비밀번호를 '0000'으로 강제 초기화하시겠습니까?`)) {
+          store.resetPartnerPin(partnerRole, '0000');
+          alert("비밀번호가 '0000'으로 초기화되었습니다.");
+          pinAlertModal.remove();
+          renderMyTab(userId, container); // 화면 새로고침
+        }
+      });
+      
+      pinAlertModal.querySelector('#btn-partner-pin-close').addEventListener('click', () => {
+        pinAlertModal.remove();
+      });
+    });
+  }
+
+  // 🔒 2) 내 비밀번호 변경 리스너
+  container.querySelector('#btn-change-my-pin').addEventListener('click', () => {
+    const myRole = isA ? 'A' : 'B';
+    const currentPin = data.users[myRole].pin;
+    
+    const changePinModal = document.createElement('div');
+    changePinModal.style = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.45); display: flex; align-items: center;
+      justify-content: center; z-index: 10005; padding: 20px;
+      backdrop-filter: blur(4px);
+    `;
+    
+    changePinModal.innerHTML = `
+      <div class="cute-card" style="width: 100%; max-width: 310px; background: white; margin-bottom: 0; text-align: center; animation: bounce-cute 0.25s forwards;">
+        <div style="font-size: 2.2rem; margin-bottom: 6px;">🔒</div>
+        <h4 style="margin-bottom: 4px; font-weight:700; font-size: 1.1rem; color:var(--color-text);">내 비밀번호 변경</h4>
+        <p style="font-size: 0.78rem; color: var(--color-text-light); line-height: 1.4; margin-bottom: 16px;">
+          본인 확인 및 변경할 새 비밀번호를 입력하세요.
+        </p>
+
+        <input type="password" class="cute-input" id="input-my-old-pin" placeholder="기존 비밀번호 4자리" maxlength="4" pattern="[0-8]*" inputmode="numeric" style="text-align: center; font-size:0.95rem; letter-spacing:4px; margin-bottom:8px;">
+        <input type="password" class="cute-input" id="input-my-new-pin" placeholder="새 비밀번호 4자리" maxlength="4" pattern="[0-8]*" inputmode="numeric" style="text-align: center; font-size:0.95rem; letter-spacing:4px; margin-bottom:12px;">
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button class="cute-btn primary cute-btn-sm" id="btn-change-pin-confirm" style="width: 100%;">비밀번호 변경</button>
+          <button class="cute-btn neutral cute-btn-sm" id="btn-change-pin-close" style="width: 100%;">취소</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(changePinModal);
+    
+    changePinModal.querySelector('#btn-change-pin-confirm').addEventListener('click', () => {
+      const oldPin = changePinModal.querySelector('#input-my-old-pin').value.trim();
+      const newPin = changePinModal.querySelector('#input-my-new-pin').value.trim();
+      
+      if (oldPin !== currentPin) {
+        alert("기존 비밀번호가 일치하지 않습니다.");
+        return;
+      }
+      if (newPin.length !== 4 || isNaN(Number(newPin))) {
+        alert("새 비밀번호는 숫자 4자리로 정확히 입력해 주세요.");
+        return;
+      }
+      
+      store.updateMyPin(newPin);
+      alert("개인 비밀번호가 성공적으로 변경되었습니다.");
+      changePinModal.remove();
+      renderMyTab(userId, container);
+    });
+    
+    changePinModal.querySelector('#btn-change-pin-close').addEventListener('click', () => {
+      changePinModal.remove();
+    });
   });
 }
