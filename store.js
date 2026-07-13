@@ -27,19 +27,19 @@ const INITIAL_DATA = {
   invitationExpiredAt: "",
   
   users: {
-    A: { id: "user_a", name: "동글이", role: "admin", color: "pink" },
-    B: { id: "user_b", name: "몽글이", role: "member", color: "mint" }
+    A: { id: "user_a", name: "동글이", role: "admin", color: "pink", pin: "" }, // pin 추가
+    B: { id: "user_b", name: "몽글이", role: "member", color: "mint", pin: "" } // pin 추가
   },
 
   categories: [...DEFAULT_CATEGORIES],
-  assets: [], // 실전 개설을 위해 더미데이터 제거 (빈 배열로 시작)
-  transactions: [], // 실전 개설을 위해 더미데이터 제거 (빈 배열로 시작)
+  assets: [], 
+  transactions: [], 
 
   settings: {
     includeHiddenTxInSummary: true
   },
 
-  firebaseConfig: DEFAULT_FIREBASE_CONFIG, // 기본값 내장
+  firebaseConfig: DEFAULT_FIREBASE_CONFIG, 
   walletId: null,
   myUserId: null 
 };
@@ -55,7 +55,6 @@ class FirebaseSyncManager {
 
   init(config) {
     if (!config) return false;
-    // 임시 가짜 데모 프로젝트 키인 경우 실제 Firebase 로딩을 하지 않고 시뮬레이션 모드로 작동
     if (config.apiKey && config.apiKey.includes("MockUp")) {
       this.active = true;
       this.isMockDemo = true;
@@ -223,7 +222,6 @@ class JointWalletStore {
     this.listeners = [];
     this.syncManager = new FirebaseSyncManager();
 
-    // 로컬 스토리지에 파이어베이스 설정이 비어 있다면 내장된 기본 설정을 자동으로 심어줌
     if (!this.data.firebaseConfig) {
       this.data.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
       this._save();
@@ -236,7 +234,6 @@ class JointWalletStore {
       }
     }
 
-    // 🖥️ 동일 PC 내 여러 브라우저 탭(창 2개) 간 로컬 실시간 자동 동기화 브릿지 탑재
     window.addEventListener('storage', (e) => {
       if (e.key === STORAGE_KEY) {
         console.log("다른 탭에서 변경된 로컬 데이터를 수신하여 실시간 새로고침합니다.");
@@ -286,8 +283,6 @@ class JointWalletStore {
     this.data.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
     this._save();
     
-    // 💡 디버그 해제: 초기화 직후에도 파이어베이스 통신 라인은 계속 유지해서 
-    //    새로고침 없이도 즉시 코드로 복원이 가능하도록 함
     this.syncManager.init(DEFAULT_FIREBASE_CONFIG);
   }
 
@@ -355,13 +350,15 @@ class JointWalletStore {
     );
   }
 
-  createWallet(creatorName = "동글이") {
+  // 📝 4자리 PIN 저장 연동 개설 기능
+  createWallet(creatorName = "동글이", pin = "0000") {
     this.data.myUserId = "user_a";
     this.data.users.A.name = creatorName;
+    this.data.users.A.pin = pin; // 핀번호 기입
     this.data.status = "waiting_invitation";
     this.data.walletId = `wallet_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-    this.data.assets = []; // 초기화 보장
-    this.data.transactions = []; // 초기화 보장
+    this.data.assets = []; 
+    this.data.transactions = []; 
     this.regenerateInvitation();
 
     if (this.syncManager.isActive()) {
@@ -374,6 +371,39 @@ class JointWalletStore {
     this.data.users.B.name = partnerName;
     this.data.status = "waiting_invitation";
     this._save();
+  }
+
+  // 🔒 내 비밀번호 변경 API
+  updateMyPin(newPin) {
+    const isA = this.data.myUserId === 'user_a';
+    if (isA) {
+      this.data.users.A.pin = newPin;
+    } else {
+      this.data.users.B.pin = newPin;
+    }
+    this._save();
+
+    if (this.syncManager.isActive()) {
+      this.syncManager.updateWalletMeta(this.data.walletId, { users: this.data.users });
+    }
+  }
+
+  // 🔒 파트너 핀번호 확인/원격 초기화 API
+  resetPartnerPin(partnerRole, newPin = null) {
+    const isPartnerA = partnerRole === 'user_a';
+    const targetKey = isPartnerA ? 'A' : 'B';
+    
+    if (newPin) {
+      this.data.users[targetKey].pin = newPin;
+      this._save();
+      if (this.syncManager.isActive()) {
+        this.syncManager.updateWalletMeta(this.data.walletId, { users: this.data.users });
+      }
+      return { success: true, message: "비밀번호가 성공적으로 초기화되었습니다." };
+    }
+    
+    // 단순 조회
+    return { success: true, pin: this.data.users[targetKey].pin };
   }
 
   updateWalletName(newName) {
@@ -403,35 +433,46 @@ class JointWalletStore {
     }
   }
 
-  async acceptInvitation(code, chosenRole = null) {
+  // 🔒 acceptInvitation에서 핀번호 및 몽글이 신규 가입 닉네임과 PIN 셋업
+  async acceptInvitation(code, chosenRole = null, chosenPin = null, partnerName = null, partnerPin = null) {
     const cleanCode = code.trim().toUpperCase();
     const storedCode = (this.data.invitationCode || "").trim().toUpperCase();
 
-    console.log("초대 코드 검증 시도:", { 입력값: cleanCode, 저장된값: storedCode, 지정역할: chosenRole });
+    console.log("초대 코드 검증 시도:", { 입력값: cleanCode, 지정역할: chosenRole, 제공핀: chosenPin, 신규참여자: partnerName });
 
-    // 1) 가상 데모 모드이거나 로컬 탭 매칭 모드일 경우 (LocalStorage 공유 가능 시)
+    // 1) 로컬 오프라인 매칭 (두 탭 간 LocalStorage 공유 시)
     if (!chosenRole && storedCode && storedCode === cleanCode) {
       if (this.data.status === 'active') {
         return { status: 'require_role_choice', dbData: this.data };
       }
       this.data.myUserId = "user_b";
+      this.data.users.B.name = partnerName || "몽글이";
+      this.data.users.B.pin = partnerPin || "0000";
       this.data.status = 'active';
       this._save();
 
       if (this.syncManager.isActive()) {
-        await this.syncManager.updateWalletMeta(this.data.walletId, { status: 'active' });
+        await this.syncManager.updateWalletMeta(this.data.walletId, { 
+          status: 'active',
+          users: this.data.users
+        });
       }
       return { status: 'success' };
     }
 
+    // 로컬 모드 역할 복원 시 PIN 검증
     if (chosenRole && storedCode && storedCode === cleanCode) {
+      const storedPin = this.data.users[chosenRole === 'user_a' ? 'A' : 'B'].pin || "";
+      if (chosenPin !== null && storedPin !== chosenPin) {
+        return { status: 'pin_failed' };
+      }
       this.data.myUserId = chosenRole;
       this.data.status = 'active';
       this._save();
       return { status: 'success' };
     }
 
-    // 2) Firebase 활성화 상태이며, 가짜 데모가 아닌 실제 데이터베이스 쿼리
+    // 2) Firebase 활성화 상태 실제 데이터베이스 쿼리
     if (this.syncManager.isActive() && !this.syncManager.isMockDemo) {
       try {
         console.log("Firestore에서 초대 코드로 지갑 찾는 중...", cleanCode);
@@ -444,8 +485,15 @@ class JointWalletStore {
           const matchedDoc = querySnap.docs[0];
           const matchedWalletId = matchedDoc.id;
           const dbData = matchedDoc.data();
+          const dbUsers = dbData.users || {};
 
+          // A. 역할 복원 시도 케이스 (재로그인)
           if (chosenRole) {
+            const storedPin = dbUsers[chosenRole === 'user_a' ? 'A' : 'B']?.pin || "";
+            if (chosenPin !== null && storedPin !== chosenPin) {
+              return { status: 'pin_failed' };
+            }
+
             this.data.walletId = matchedWalletId;
             this.data.myUserId = chosenRole;
             this.data.status = 'active';
@@ -458,17 +506,19 @@ class JointWalletStore {
             return { status: 'success' };
           }
 
+          // B. 이미 활성화(active)된 지갑방인데 역할 지정 없이 처음 노크한 경우 ➔ 복원 역할 선택 호출
           if (dbData.status === 'active') {
             return { status: 'require_role_choice', dbData: dbData };
           }
 
+          // C. 신규 조인 참여(몽글이 가입 단계)
           this.data.walletId = matchedWalletId;
           this.data.status = 'active';
           this.data.myUserId = "user_b";
           
-          const dbUsers = dbData.users || {};
           if (dbUsers.B) {
-            dbUsers.B.name = this.data.users.B.name;
+            dbUsers.B.name = partnerName || "몽글이";
+            dbUsers.B.pin = partnerPin || "0000";
           }
           
           await this.syncManager.db.collection('wallets').doc(matchedWalletId).update({
@@ -476,6 +526,7 @@ class JointWalletStore {
             users: dbUsers
           });
 
+          this.data.users = dbUsers;
           this._save();
           this._startFirebaseSync();
           return { status: 'success' };
@@ -500,8 +551,6 @@ class JointWalletStore {
     this.data.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
     this._save();
 
-    // 💡 디버그 해제: 연결을 끊은 후에도 파이어베이스 커넥션은 즉시 켜두어, 
-    //    유저가 새로고침 없이 즉석에서 방 재가입이나 참여를 바로 할 수 있도록 함
     this.syncManager.init(DEFAULT_FIREBASE_CONFIG);
   }
 
