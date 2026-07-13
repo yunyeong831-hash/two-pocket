@@ -32,21 +32,14 @@ const INITIAL_DATA = {
   },
 
   categories: [...DEFAULT_CATEGORIES],
-  assets: [
-    { id: "a_bank", userId: "user_a", name: "동글 주거래 통장", type: "saving", amount: 2000000, currency: "KRW", isShared: true, hideFromTotal: false, memo: "생활비 및 공과금용", updatedAt: "2026-07-13T01:00:00Z" },
-    { id: "a_cash", userId: "user_a", name: "동글이 비상금 지갑", type: "cash", amount: 50000, currency: "KRW", isShared: true, hideFromTotal: false, memo: "책상 서랍 속", updatedAt: "2026-07-12T10:00:00Z" },
-    { id: "b_bank", userId: "user_b", name: "몽글 도토리 저금통", type: "saving", amount: 1800000, currency: "KRW", isShared: true, hideFromTotal: false, memo: "비상저금" }
-  ],
-  transactions: [
-    { id: "tx_1", userId: "user_a", type: "expense", category: "food", amount: 15000, date: "2026-07-11", memo: "마트 장보기 🍓", isShared: true, includeInSummary: true, linkedAssetId: "a_bank", targetAssetId: null, receipts: [] },
-    { id: "tx_2", userId: "user_b", type: "expense", category: "living", amount: 45000, date: "2026-07-12", memo: "커플 잠옷 세트 🧸", isShared: true, includeInSummary: true, linkedAssetId: "b_bank", targetAssetId: null, receipts: [] }
-  ],
+  assets: [], // 👈 실전 개설을 위해 더미데이터 제거 (빈 배열로 시작)
+  transactions: [], // 👈 실전 개설을 위해 더미데이터 제거 (빈 배열로 시작)
 
   settings: {
     includeHiddenTxInSummary: true
   },
 
-  firebaseConfig: DEFAULT_FIREBASE_CONFIG, // 👈 기본값으로 내장 적용
+  firebaseConfig: DEFAULT_FIREBASE_CONFIG, // 기본값 내장
   walletId: null,
   myUserId: null 
 };
@@ -364,6 +357,8 @@ class JointWalletStore {
     this.data.users.A.name = creatorName;
     this.data.status = "waiting_invitation";
     this.data.walletId = `wallet_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    this.data.assets = []; // 초기화 보장
+    this.data.transactions = []; // 초기화 보장
     this.regenerateInvitation();
 
     if (this.syncManager.isActive()) {
