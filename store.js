@@ -32,8 +32,8 @@ const INITIAL_DATA = {
   },
 
   categories: [...DEFAULT_CATEGORIES],
-  assets: [], // 👈 실전 개설을 위해 더미데이터 제거 (빈 배열로 시작)
-  transactions: [], // 👈 실전 개설을 위해 더미데이터 제거 (빈 배열로 시작)
+  assets: [], // 실전 개설을 위해 더미데이터 제거 (빈 배열로 시작)
+  transactions: [], // 실전 개설을 위해 더미데이터 제거 (빈 배열로 시작)
 
   settings: {
     includeHiddenTxInSummary: true
@@ -283,9 +283,12 @@ class JointWalletStore {
   reset() {
     this.syncManager.disconnect();
     this.data = JSON.parse(JSON.stringify(INITIAL_DATA));
-    // 초기화 시에도 기본 파이어베이스 환경은 즉시 다시 셋업
     this.data.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
     this._save();
+    
+    // 💡 디버그 해제: 초기화 직후에도 파이어베이스 통신 라인은 계속 유지해서 
+    //    새로고침 없이도 즉시 코드로 복원이 가능하도록 함
+    this.syncManager.init(DEFAULT_FIREBASE_CONFIG);
   }
 
   getMyUserId() {
@@ -488,17 +491,18 @@ class JointWalletStore {
   }
 
   disconnectWallet() {
-    if (this.syncManager.isActive()) {
-      this.syncManager.updateWalletMeta(this.data.walletId, { status: 'landing' });
-    }
-    
     this.syncManager.disconnect();
     this.data.status = 'landing'; 
     this.data.transactions = [];
-    this.data.assets = this.data.assets.filter(a => a.userId === 'user_a');
+    this.data.assets = [];
     this.data.walletId = null;
     this.data.myUserId = null;
+    this.data.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
     this._save();
+
+    // 💡 디버그 해제: 연결을 끊은 후에도 파이어베이스 커넥션은 즉시 켜두어, 
+    //    유저가 새로고침 없이 즉석에서 방 재가입이나 참여를 바로 할 수 있도록 함
+    this.syncManager.init(DEFAULT_FIREBASE_CONFIG);
   }
 
   getCategories() {
