@@ -33,28 +33,142 @@ export function showToast(container, message) {
   setTimeout(() => toast.remove(), 2200);
 }
 
+// 🌐 랜딩 및 초대대기 화면에서 사용할 Firebase 설정 공용 모달 팝업
+export function showFirebaseConfigModal(container) {
+  const modal = document.createElement('div');
+  modal.style = `
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.45); display: flex; align-items: center;
+    justify-content: center; z-index: 9999; padding: 20px;
+    backdrop-filter: blur(4px);
+  `;
+
+  const isFirebaseSyncActive = store.syncManager.isActive();
+  const syncStatusHtml = isFirebaseSyncActive
+    ? `<span class="sticker mint" style="margin-bottom:0; font-size:0.75rem;">실시간 연동 완료 📡</span>`
+    : `<span class="sticker yellow" style="margin-bottom:0; font-size:0.75rem;">오프라인 (로컬 모드) 🔒</span>`;
+
+  modal.innerHTML = `
+    <div class="cute-card" style="width: 100%; max-width: 340px; background: white; margin-bottom: 0; animation: bounce-cute 0.3s forwards;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span style="font-weight:700; font-size:0.95rem;">Firebase 동기화 설정</span>
+        ${syncStatusHtml}
+      </div>
+      
+      <p style="font-size:0.75rem; color:var(--color-text-light); line-height:1.5; margin-bottom:14px; text-align:left;">
+        무선 연동을 활성화하려면 Firebase 웹 자격증명 JSON을 붙여넣으세요.
+      </p>
+
+      <textarea class="cute-textarea" id="modal-firebase-config" placeholder='{
+  "apiKey": "AIzaSy...",
+  "authDomain": "...",
+  "projectId": "...",
+  "storageBucket": "...",
+  "messagingSenderId": "...",
+  "appId": "..."
+}' style="font-family: monospace; font-size: 0.72rem; height: 110px; margin-bottom:12px; line-height:1.3; text-align:left;">${store.data.firebaseConfig ? JSON.stringify(store.data.firebaseConfig, null, 2) : ''}</textarea>
+
+      <div style="display:flex; gap:6px; margin-bottom:12px;">
+        <button class="cute-btn primary cute-btn-sm" id="btn-modal-save-firebase" style="flex:2; font-size:0.78rem;">동기화 활성화</button>
+        <button class="cute-btn neutral cute-btn-sm" id="btn-modal-clear-firebase" style="flex:1; color:var(--color-red); font-size:0.78rem;">해제</button>
+      </div>
+
+      <button class="cute-btn secondary cute-btn-sm" id="btn-modal-fill-demo" style="width:100%; font-size:0.75rem; background-color: var(--color-blue-bg); margin-bottom:12px;">
+        💡 테스트용 공용 데모 계정으로 자동 입력
+      </button>
+
+      <button class="cute-btn neutral cute-btn-sm" id="btn-modal-close" style="width: 100%;">닫기</button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const txtConfig = modal.querySelector('#modal-firebase-config');
+
+  modal.querySelector('#btn-modal-save-firebase').addEventListener('click', () => {
+    const rawVal = txtConfig.value.trim();
+    if (!rawVal) {
+      alert("Firebase Config JSON 코드를 입력해 주세요.");
+      return;
+    }
+    try {
+      const parsedConfig = JSON.parse(rawVal);
+      const res = store.setupFirebase(parsedConfig);
+      if (res.success) {
+        alert(res.message);
+        modal.remove();
+        window.location.reload();
+      } else {
+        alert(res.message);
+      }
+    } catch (e) {
+      alert("올바른 JSON 형식이 아닙니다. 입력값을 확인해 주세요.");
+    }
+  });
+
+  modal.querySelector('#btn-modal-clear-firebase').addEventListener('click', () => {
+    if (confirm("클라우드 실시간 동기화를 끄고 로컬 모드로 복귀하시겠습니까?")) {
+      store.setupFirebase(null);
+      modal.remove();
+      window.location.reload();
+    }
+  });
+
+  modal.querySelector('#btn-modal-fill-demo').addEventListener('click', () => {
+    const demoConfig = {
+      apiKey: "AIzaSyAs1-U90kDemoTwoPocketCloudKeyMockUp",
+      authDomain: "two-pocket-demo.firebaseapp.com",
+      projectId: "two-pocket-demo",
+      storageBucket: "two-pocket-demo.appspot.com",
+      messagingSenderId: "987654321012",
+      appId: "1:987654321012:web:demo123456789abcde"
+    };
+    txtConfig.value = JSON.stringify(demoConfig, null, 2);
+    showToast(container, "데모 설정이 임시 작성되었습니다.");
+  });
+
+  modal.querySelector('#btn-modal-close').addEventListener('click', () => {
+    modal.remove();
+  });
+}
+
 // 🚀 시작 전 메인 랜딩 페이지 렌더러 (투포켓 전용 브랜딩)
 export function renderLandingScreen(userId, container) {
   const isA = userId === 'user_a';
   const defaultName = isA ? "동글이" : "몽글이";
 
+  const isSyncActive = store.syncManager.isActive();
+  const syncLinkText = isSyncActive 
+    ? "🟢 실시간 동기화(Firebase) 설정 변경" 
+    : "📡 실시간 무선 동기화(Firebase) 먼저 설정하기";
+
+  // 로컬 호스트(개발환경)일 때만 디버깅용 설정 링크 노출
+  const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const localSettingHtml = isLocalEnv 
+    ? `<div style="margin-top: 8px; margin-bottom: 16px;">
+        <button class="cute-btn neutral cute-btn-sm" id="btn-landing-go-firebase" style="font-size: 0.78rem; text-decoration: underline; background: transparent; border: none; color: var(--color-blue); font-weight: 700; cursor: pointer;">
+          ${syncLinkText}
+        </button>
+       </div>`
+    : '';
+
   container.innerHTML = `
-    <div style="text-align: center; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+    <div style="text-align: center; padding: 30px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
       <!-- 투포켓 시그니처 엠블럼 -->
-      <div style="font-size: 4.5rem; margin-bottom: 20px; filter: drop-shadow(0px 8px 16px rgba(49, 130, 246, 0.15)); animation: pulse-cute 2s infinite alternate;">
+      <div style="font-size: 4rem; margin-bottom: 16px; filter: drop-shadow(0px 8px 16px rgba(49, 130, 246, 0.15)); animation: pulse-cute 2s infinite alternate;">
         👛
       </div>
       
-      <h2 class="paperlogy-title" style="font-size: 2.2rem; color: var(--color-text); margin-bottom: 8px;">
+      <h2 class="paperlogy-title" style="font-size: 2.1rem; color: var(--color-text); margin-bottom: 6px;">
         투포켓
       </h2>
-      <p class="paperlogy-sub" style="font-size: 0.95rem; color: var(--color-text-light); line-height: 1.6; margin-bottom: 30px;">
+      <p class="paperlogy-sub" style="font-size: 0.92rem; color: var(--color-text-light); line-height: 1.6; margin-bottom: 24px;">
         주머니는 각자 따로, 관리는 같이!<br>
         복잡한 통장합치기 없이, 우리 둘의 미래 자산을 키워나가요.
       </p>
 
       <!-- 2인 뷰포트 모두 동일한 닉네임 기입 및 루트 선택 카드 노출 -->
-      <div class="cute-card" style="width: 100%; border: 1px solid var(--color-border); padding: 20px; background: #FFFFFF; text-align: left;">
+      <div class="cute-card" style="width: 100%; border: 1px solid var(--color-border); padding: 20px; background: #FFFFFF; text-align: left; margin-bottom: 12px;">
         <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">사용할 닉네임</label>
         <input type="text" class="cute-input" id="landing-user-name-${userId}" value="${defaultName}" placeholder="이름을 입력해 주세요" style="margin-bottom: 16px;" required>
 
@@ -64,7 +178,9 @@ export function renderLandingScreen(userId, container) {
         </div>
       </div>
 
-      <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-top: 40px;">
+      ${localSettingHtml}
+
+      <div style="font-size: 0.72rem; color: var(--color-text-muted);">
         🔒 데이터는 기기 브라우저에 투명하게 보관됩니다.
       </div>
     </div>
@@ -93,6 +209,13 @@ export function renderLandingScreen(userId, container) {
     const name = nameInput.value.trim() || "몽글이";
     store.joinAsPartner(name);
   });
+
+  // 로컬 환경일 때만 파이어베이스 셋팅 모달 링크 리스너 작동
+  if (isLocalEnv) {
+    container.querySelector('#btn-landing-go-firebase').addEventListener('click', () => {
+      showFirebaseConfigModal(container);
+    });
+  }
 }
 
 // 1. 초대 대기 중 화면 렌더링
@@ -115,10 +238,14 @@ export function renderInvitationScreen(userId, container) {
           </span>
         </div>
         
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
           <button class="cute-btn primary cute-btn-sm" id="btn-copy-code" style="flex:1;">코드 복사하기</button>
           <button class="cute-btn neutral cute-btn-sm" id="btn-regen-code">새로 만들기</button>
         </div>
+
+        <button class="cute-btn neutral cute-btn-sm" id="btn-invite-cancel-go" style="width:100%; color:var(--color-red); background-color: var(--color-red-bg);">
+          가계부 개설 취소
+        </button>
       </div>
     `;
     
@@ -131,18 +258,41 @@ export function renderInvitationScreen(userId, container) {
       store.regenerateInvitation();
       showToast(container, "새로운 코드가 생성되었습니다.");
     });
+
+    container.querySelector('#btn-invite-cancel-go').addEventListener('click', () => {
+      if (confirm("정말 개설을 취소하고 첫 화면으로 돌아가시겠습니까?")) {
+        store.disconnectWallet();
+        window.location.reload();
+      }
+    });
   } else {
+    // 로컬 호스트(개발환경)일 때만 디버깅용 설정 링크 노출
+    const isLocalEnv = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const localSettingHtml = isLocalEnv 
+      ? `<button class="cute-btn secondary cute-btn-sm" id="btn-invite-go-firebase-b" style="width: 100%; font-size: 0.78rem;">
+          📡 실시간 동기화(Firebase) 설정하기
+         </button>`
+      : '';
+
     container.innerHTML = `
       <div class="cute-card" style="border-color: var(--color-green); margin-top: 10px;">
-        <div class="sticker mint">포켓 참여</div>
-        <h3 class="cute-card-title">동글이의 투포켓 지갑 참여하기</h3>
+        <div class="sticker mint">포켓 참여 / 가계부 복원</div>
+        <h3 class="cute-card-title">초대코드로 지갑 동화하기</h3>
         <p style="margin-bottom: 20px; font-size: 0.9rem; color: var(--color-text-light); line-height: 1.5;">
-          동글이에게 받은 초대 코드(예: SWEET-XXXX)를 입력창에 적어주세요.
+          파트너에게 공유받은 초대 코드(예: SWEET-XXXX)를 입력창에 적어주세요. 
+          이미 사용 중이던 지갑일 경우, 본인의 원래 역할을 선택해 동기화 상태를 그대로 복구할 수 있습니다.
         </p>
         
         <input type="text" class="cute-input" id="input-invite-code" placeholder="초대 코드 입력" style="text-align: center; text-transform: uppercase;">
         
-        <button class="cute-btn primary" id="btn-submit-code" style="width: 100%;">초대 코드 확인</button>
+        <button class="cute-btn primary" id="btn-submit-code" style="width: 100%; margin-bottom: 12px;">초대 코드 확인</button>
+        
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${localSettingHtml}
+          <button class="cute-btn neutral cute-btn-sm" id="btn-invite-cancel-go-b" style="width: 100%; color:var(--color-red);">
+            취소 및 돌아가기
+          </button>
+        </div>
       </div>
     `;
     
@@ -152,16 +302,94 @@ export function renderInvitationScreen(userId, container) {
         showToast(container, "코드를 입력해 주세요.");
         return;
       }
-      // acceptInvitation은 Firestore 비동기 처리를 탈 수 있으므로 비동기로 실행 호출
-      store.acceptInvitation(code).then(success => {
-        if (success) {
+      
+      store.acceptInvitation(code).then(res => {
+        if (res.status === 'success') {
           showToast(container, "성공적으로 연결되었습니다.");
+        } else if (res.status === 'require_role_choice') {
+          showRoleChoiceModal(code, container);
         } else {
           showToast(container, "초대 코드가 유효하지 않습니다.");
         }
       });
     });
+
+    if (isLocalEnv) {
+      container.querySelector('#btn-invite-go-firebase-b').addEventListener('click', () => {
+        showFirebaseConfigModal(container);
+      });
+    }
+
+    container.querySelector('#btn-invite-cancel-go-b').addEventListener('click', () => {
+      store.disconnectWallet();
+      window.location.reload();
+    });
   }
+}
+
+// 👑 가계부 복원 선택 다이얼로그 모달 모듈
+function showRoleChoiceModal(code, container) {
+  const modal = document.createElement('div');
+  modal.style = `
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.45); display: flex; align-items: center;
+    justify-content: center; z-index: 9999; padding: 20px;
+    backdrop-filter: blur(4px);
+  `;
+  
+  modal.innerHTML = `
+    <div class="cute-card" style="width: 100%; max-width: 330px; background: white; margin-bottom: 0; text-align: center; animation: bounce-cute 0.3s forwards;">
+      <div style="font-size: 2.5rem; margin-bottom: 8px;">🔑</div>
+      <h3 class="cute-card-title" style="margin-bottom: 8px; font-size: 1.15rem;">기존 가계부 복원</h3>
+      <p style="font-size: 0.82rem; color: var(--color-text-light); line-height: 1.5; margin-bottom: 22px;">
+        이미 활성화 완료된 지갑이 감지되었습니다.<br>이 기기에서 복구하실 역할을 선택해 주세요.
+      </p>
+      
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="cute-btn primary cute-btn-sm" id="btn-choice-a" style="background-color: var(--color-pink); color: white; width: 100%; font-size: 0.85rem;">
+          동글이 (방장)로 복원하기
+        </button>
+        <button class="cute-btn primary cute-btn-sm" id="btn-choice-b" style="background-color: var(--color-green); color: white; width: 100%; font-size: 0.85rem;">
+          몽글이 (파트너)로 복원하기
+        </button>
+        <button class="cute-btn neutral cute-btn-sm" id="btn-choice-cancel" style="width: 100%;">
+          취소
+        </button>
+      </div>
+    </div>
+  `;
+  
+  if (!document.getElementById('style-bounce-modal')) {
+    const style = document.createElement('style');
+    style.id = 'style-bounce-modal';
+    style.innerHTML = `
+      @keyframes bounce-cute {
+        0% { transform: scale(0.9); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.body.appendChild(modal);
+  
+  modal.querySelector('#btn-choice-a').addEventListener('click', () => {
+    store.acceptInvitation(code, 'user_a').then(() => {
+      modal.remove();
+      showToast(container, "동글이로 복원되었습니다.");
+    });
+  });
+  
+  modal.querySelector('#btn-choice-b').addEventListener('click', () => {
+    store.acceptInvitation(code, 'user_b').then(() => {
+      modal.remove();
+      showToast(container, "몽글이로 복원되었습니다.");
+    });
+  });
+  
+  modal.querySelector('#btn-choice-cancel').addEventListener('click', () => {
+    modal.remove();
+  });
 }
 
 // 🏠 [홈 탭] 소비분석 및 요약 렌더러
@@ -216,12 +444,12 @@ export function renderHomeTab(userId, container) {
     <!-- 1. 합산 포켓 자산 요약 카드 -->
     <div class="cute-card summary-card-full" id="total-asset-box" style="cursor: pointer;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-        <span style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-light);">합산 포켓 자산</span>
-        <span style="font-size: 0.75rem; color: var(--color-text-muted);">공유 포켓 기준</span>
+        <span style="font-size: 0.85rem; font-weight: 600; color: #E8F3FF;">합산 포켓 자산</span>
+        <span style="font-size: 0.75rem; color: #D9EBFF;">공유 포켓 기준</span>
       </div>
       <div class="total-asset-val">${formatMoney(summary.totalJointAsset)}</div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-        <span style="font-size: 0.8rem; color: var(--color-text-muted);">전월 대비 +1,280,000원</span>
+        <span style="font-size: 0.8rem; color: #D9EBFF;">전월 대비 +1,280,000원</span>
         <span class="trend-badge up" style="font-size: 0.75rem; padding: 2px 6px;">▲ 1.1%</span>
       </div>
     </div>
@@ -315,16 +543,16 @@ export function renderHomeTab(userId, container) {
   }
 
   container.querySelector('#total-asset-box').addEventListener('click', () => {
-    document.querySelector(`#nav-${userId === 'user_a' ? 'user-a' : 'user-b'} [data-tab="assets"]`).click();
+    document.querySelector('.nav-btn[data-tab="assets"]').click();
   });
   container.querySelector('#btn-go-tx-tab-link').addEventListener('click', () => {
-    document.querySelector(`#nav-${userId === 'user_a' ? 'user-a' : 'user-b'} [data-tab="txs"]`).click();
+    document.querySelector('.nav-btn[data-tab="txs"]').click();
   });
   container.querySelector('#btn-go-record-tx').addEventListener('click', () => {
-    document.querySelector(`#nav-${userId === 'user_a' ? 'user-a' : 'user-b'} [data-tab="txs"]`).click();
+    document.querySelector('.nav-btn[data-tab="txs"]').click();
   });
   container.querySelector('#share-info-banner').addEventListener('click', () => {
-    document.querySelector(`#nav-${userId === 'user_a' ? 'user-a' : 'user-b'} [data-tab="assets"]`).click();
+    document.querySelector('.nav-btn[data-tab="assets"]').click();
   });
 }
 
@@ -1189,8 +1417,6 @@ export function renderMyTab(userId, container) {
 
   // 모바일 1인 기기 뷰포트로 각각 접속할 수 있는 실주소 계산
   const baseLink = window.location.origin + window.location.pathname;
-  const myLink = `${baseLink}?user=${userId}`;
-  const partnerLink = `${baseLink}?user=${partnerId}`;
 
   container.innerHTML = `
     <!-- 1. 공유 지갑 정보 -->
@@ -1198,10 +1424,10 @@ export function renderMyTab(userId, container) {
     <div class="cute-card">
       <div class="setting-row">
         <div class="setting-info">
-          <span class="setting-title">지갑 이름 (투포켓)</span>
-          <span class="setting-sub" id="wallet-name-display">${data.walletName}</span>
+          <span class="setting-title">투포켓 코드</span>
+          <span class="setting-sub" style="font-weight: 700; color: var(--color-blue); font-size: 0.95rem;">${data.invitationCode}</span>
         </div>
-        ${isA ? `<button class="cute-btn cute-btn-sm secondary" id="btn-edit-wallet-name">변경</button>` : ''}
+        <button class="cute-btn cute-btn-sm secondary" id="btn-copy-wallet-code-my">복사</button>
       </div>
       <div class="setting-row">
         <div class="setting-info">
@@ -1212,15 +1438,6 @@ export function renderMyTab(userId, container) {
           </span>
         </div>
       </div>
-      ${data.status === 'active' ? '' : `
-      <div class="setting-row">
-        <div class="setting-info">
-          <span class="setting-title">포켓 초대 코드</span>
-          <span class="setting-sub">상대방에게 이 코드를 알려주세요.</span>
-        </div>
-        <strong style="color:var(--color-blue); font-size:1.1rem;">${data.invitationCode}</strong>
-      </div>
-      `}
     </div>
 
     <!-- 2. Firebase 실시간 무선 동기화 셋팅 영역 -->
@@ -1255,9 +1472,9 @@ export function renderMyTab(userId, container) {
 
       ${isFirebaseSyncActive ? `
       <div style="background:#FAFBFB; border: 1px dashed var(--color-border); padding: 10px; border-radius: var(--border-radius-md); font-size:0.72rem; line-height:1.5;">
-        <strong>📱 폰으로 접속할 수 있는 개별 전용 웹 링크:</strong><br>
-        - 내 폰 접속용: <a href="${myLink}" target="_blank" style="color:var(--color-blue); text-decoration:underline; word-break:break-all;">${myLink}</a><br>
-        - 남편분 접속용: <a href="${partnerLink}" target="_blank" style="color:var(--color-green); text-decoration:underline; word-break:break-all;">${partnerLink}</a>
+        <strong>📱 폰 접속 공유 링크:</strong><br>
+        <a href="${baseLink}" target="_blank" style="color:var(--color-blue); text-decoration:underline; word-break:break-all;">${baseLink}</a><br>
+        - 동기화 후 파트너가 최초 접속하면 자동으로 <strong>'몽글이'</strong> 역할이 기기에 귀속됩니다.
       </div>
       ` : ''}
     </div>
@@ -1345,7 +1562,6 @@ export function renderMyTab(userId, container) {
 
   // 데모 계정 자동 입력 버튼 리스너 (사용자의 즉석 테스트 편의성)
   container.querySelector(`#btn-fill-demo-firebase-${userId}`).addEventListener('click', () => {
-    // 투포켓 테스트 및 평가를 위한 공용 클라우드 샌드박스 키 정보 자동 주입
     const demoConfig = {
       apiKey: "AIzaSyAs1-U90kDemoTwoPocketCloudKeyMockUp",
       authDomain: "two-pocket-demo.firebaseapp.com",
@@ -1358,17 +1574,12 @@ export function renderMyTab(userId, container) {
     showToast(container, "데모 계정 설정이 임시 작성되었습니다.");
   });
 
-  if (isA) {
-    container.querySelector('#btn-edit-wallet-name').addEventListener('click', () => {
-      const currentName = data.walletName;
-      const newName = prompt("지갑 이름을 입력해 주세요.", currentName);
-      if (newName && newName.trim()) {
-        store.updateWalletName(newName.trim());
-        showToast(container, "지갑 이름이 성공적으로 변경되었습니다.");
-        renderMyTab(userId, container);
-      }
+  // 투포켓 코드 복사 버튼 리스너
+  container.querySelector('#btn-copy-wallet-code-my').addEventListener('click', () => {
+    navigator.clipboard.writeText(data.invitationCode).then(() => {
+      showToast(container, "투포켓 코드가 복사되었습니다.");
     });
-  }
+  });
 
   container.querySelector('#btn-backup-csv').addEventListener('click', () => {
     const csvContent = store.exportToCSV();

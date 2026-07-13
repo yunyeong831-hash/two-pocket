@@ -2,6 +2,16 @@
 
 const STORAGE_KEY = 'joint_wallet_data';
 
+// 📡 사용자님의 진짜 Firebase 클라우드 서버 설정 정보 (기본 빌트인 내장)
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAhW48DE-CVYi1KOy9MIhpklvAKOlTLcM4",
+  authDomain: "two-pocket-94d21.firebaseapp.com",
+  projectId: "two-pocket-94d21",
+  storageBucket: "two-pocket-94d21.firebasestorage.app",
+  messagingSenderId: "699385640372",
+  appId: "1:699385640372:web:5bd41aab2c8bae5730aee1"
+};
+
 const DEFAULT_CATEGORIES = [
   { id: "food", name: "식비", emoji: "🍔", color: "#F04452" },
   { id: "living", name: "생활", emoji: "🧼", color: "#FFB300" },
@@ -36,10 +46,8 @@ const INITIAL_DATA = {
     includeHiddenTxInSummary: true
   },
 
-  firebaseConfig: null, 
+  firebaseConfig: DEFAULT_FIREBASE_CONFIG, // 👈 기본값으로 내장 적용
   walletId: null,
-  
-  // 1인 기기 뷰포트를 위해 브라우저 세션에 저장될 고유의 내 역할 ID
   myUserId: null 
 };
 
@@ -54,6 +62,14 @@ class FirebaseSyncManager {
 
   init(config) {
     if (!config) return false;
+    // 임시 가짜 데모 프로젝트 키인 경우 실제 Firebase 로딩을 하지 않고 시뮬레이션 모드로 작동
+    if (config.apiKey && config.apiKey.includes("MockUp")) {
+      this.active = true;
+      this.isMockDemo = true;
+      console.log("투포켓 가상 데모 클라우드 채널이 활성화되었습니다!");
+      return true;
+    }
+
     try {
       if (typeof window === 'undefined' || !window.firebase) {
         console.warn("Firebase SDK가 감지되지 않았습니다.");
@@ -70,6 +86,7 @@ class FirebaseSyncManager {
       
       this.db = this.app.firestore();
       this.active = true;
+      this.isMockDemo = false;
       console.log("Firebase Firestore 실시간 동기화 가동 완료!");
       return true;
     } catch (err) {
@@ -80,7 +97,7 @@ class FirebaseSyncManager {
   }
 
   isActive() {
-    return this.active && this.db !== null;
+    return this.active && (this.isMockDemo || this.db !== null);
   }
 
   disconnect() {
@@ -89,10 +106,11 @@ class FirebaseSyncManager {
     this.active = false;
     this.db = null;
     this.app = null;
+    this.isMockDemo = false;
   }
 
   subscribe(walletId, onWalletUpdate, onAssetsUpdate, onTxsUpdate) {
-    if (!this.isActive() || !walletId) return;
+    if (!this.isActive() || this.isMockDemo || !walletId) return;
 
     this.unsubscribers.forEach(unsub => unsub());
     this.unsubscribers = [];
@@ -101,7 +119,7 @@ class FirebaseSyncManager {
       if (doc.exists) {
         onWalletUpdate(doc.data());
       }
-    }, err => console.error("지갑 정보 구독 에러", err));
+    }, err => console.error("지갑 정보 구독 에러 (Rules 설정을 확인하세요):", err));
     this.unsubscribers.push(unsubWallet);
 
     const unsubAssets = this.db.collection('wallets').doc(walletId).collection('assets').onSnapshot(snap => {
@@ -110,7 +128,7 @@ class FirebaseSyncManager {
         assets.push({ id: doc.id, ...doc.data() });
       });
       onAssetsUpdate(assets);
-    }, err => console.error("자산 목록 구독 에러", err));
+    }, err => console.error("자산 목록 구독 에러 (Rules 설정을 확인하세요):", err));
     this.unsubscribers.push(unsubAssets);
 
     const unsubTxs = this.db.collection('wallets').doc(walletId).collection('transactions').onSnapshot(snap => {
@@ -120,12 +138,12 @@ class FirebaseSyncManager {
       });
       txs.sort((a, b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
       onTxsUpdate(txs);
-    }, err => console.error("거래 내역 구독 에러", err));
+    }, err => console.error("거래 내역 구독 에러 (Rules 설정을 확인하세요):", err));
     this.unsubscribers.push(unsubTxs);
   }
 
   async uploadInitialWallet(walletId, walletData, assets, txs) {
-    if (!this.isActive()) return;
+    if (!this.isActive() || this.isMockDemo) return;
     try {
       const walletRef = this.db.collection('wallets').doc(walletId);
       
@@ -174,12 +192,12 @@ class FirebaseSyncManager {
 
       console.log("Firestore 데이터 최초 업로드 성공!");
     } catch (e) {
-      console.error("Firestore 초기 업로드 에러", e);
+      console.error("Firestore 초기 업로드 실패 (구글 콘솔 Rules 설정을 허용해 주세요):", e);
     }
   }
 
   async saveDocument(walletId, collectionName, docId, data) {
-    if (!this.isActive() || !walletId) return;
+    if (!this.isActive() || this.isMockDemo || !walletId) return;
     try {
       await this.db.collection('wallets').doc(walletId).collection(collectionName).doc(docId).set(data, { merge: true });
     } catch (e) {
@@ -188,7 +206,7 @@ class FirebaseSyncManager {
   }
 
   async deleteDocument(walletId, collectionName, docId) {
-    if (!this.isActive() || !walletId) return;
+    if (!this.isActive() || this.isMockDemo || !walletId) return;
     try {
       await this.db.collection('wallets').doc(walletId).collection(collectionName).doc(docId).delete();
     } catch (e) {
@@ -197,7 +215,7 @@ class FirebaseSyncManager {
   }
 
   async updateWalletMeta(walletId, data) {
-    if (!this.isActive() || !walletId) return;
+    if (!this.isActive() || this.isMockDemo || !walletId) return;
     try {
       await this.db.collection('wallets').doc(walletId).update(data);
     } catch (e) {
@@ -212,24 +230,43 @@ class JointWalletStore {
     this.listeners = [];
     this.syncManager = new FirebaseSyncManager();
 
+    // 로컬 스토리지에 파이어베이스 설정이 비어 있다면 내장된 기본 설정을 자동으로 심어줌
+    if (!this.data.firebaseConfig) {
+      this.data.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
+      this._save();
+    }
+
     if (this.data.firebaseConfig) {
       const initialized = this.syncManager.init(this.data.firebaseConfig);
       if (initialized && this.data.walletId) {
         this._startFirebaseSync();
       }
     }
+
+    // 🖥️ 동일 PC 내 여러 브라우저 탭(창 2개) 간 로컬 실시간 자동 동기화 브릿지 탑재
+    window.addEventListener('storage', (e) => {
+      if (e.key === STORAGE_KEY) {
+        console.log("다른 탭에서 변경된 로컬 데이터를 수신하여 실시간 새로고침합니다.");
+        this.data = this._load();
+        this.listeners.forEach(l => l(this.data));
+      }
+    });
   }
 
   _load() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_DATA));
-      return JSON.parse(JSON.stringify(INITIAL_DATA));
+      const freshData = JSON.parse(JSON.stringify(INITIAL_DATA));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(freshData));
+      return freshData;
     }
     try {
       const parsed = JSON.parse(raw);
       if (!parsed.categories) {
         parsed.categories = [...DEFAULT_CATEGORIES];
+      }
+      if (!parsed.firebaseConfig) {
+        parsed.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
       }
       return parsed;
     } catch (e) {
@@ -253,16 +290,15 @@ class JointWalletStore {
   reset() {
     this.syncManager.disconnect();
     this.data = JSON.parse(JSON.stringify(INITIAL_DATA));
+    // 초기화 시에도 기본 파이어베이스 환경은 즉시 다시 셋업
+    this.data.firebaseConfig = DEFAULT_FIREBASE_CONFIG;
     this._save();
   }
 
-  // --- 기기 고유의 역할 식별정보 반환 헬퍼 ---
   getMyUserId() {
     return this.data.myUserId;
   }
 
-  // --- Firebase 동기화 설정 및 제어 메소드 ---
-  
   setupFirebase(config) {
     if (!config) {
       this.syncManager.disconnect();
@@ -298,7 +334,7 @@ class JointWalletStore {
   }
 
   _startFirebaseSync() {
-    if (!this.syncManager.isActive() || !this.data.walletId) return;
+    if (!this.syncManager.isActive() || this.syncManager.isMockDemo || !this.data.walletId) return;
 
     this.syncManager.subscribe(
       this.data.walletId,
@@ -323,12 +359,11 @@ class JointWalletStore {
     );
   }
 
-  // --- 메인 론칭 제어 트리거 ---
-  
   createWallet(creatorName = "동글이") {
-    this.data.myUserId = "user_a"; // 개설한 폰의 세션 역할을 방장(User A)으로 락온
+    this.data.myUserId = "user_a";
     this.data.users.A.name = creatorName;
     this.data.status = "waiting_invitation";
+    this.data.walletId = `wallet_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     this.regenerateInvitation();
 
     if (this.syncManager.isActive()) {
@@ -337,7 +372,7 @@ class JointWalletStore {
   }
 
   joinAsPartner(partnerName = "몽글이") {
-    this.data.myUserId = "user_b"; // 참여한 폰의 세션 역할을 참여자(User B)로 락온
+    this.data.myUserId = "user_b";
     this.data.users.B.name = partnerName;
     this.data.status = "waiting_invitation";
     this._save();
@@ -370,24 +405,36 @@ class JointWalletStore {
     }
   }
 
-  async acceptInvitation(code) {
+  async acceptInvitation(code, chosenRole = null) {
     const cleanCode = code.trim().toUpperCase();
     const storedCode = (this.data.invitationCode || "").trim().toUpperCase();
 
-    console.log("초대 코드 검증 시도:", { 입력값: cleanCode, 저장된값: storedCode });
+    console.log("초대 코드 검증 시도:", { 입력값: cleanCode, 저장된값: storedCode, 지정역할: chosenRole });
 
-    if (storedCode && storedCode === cleanCode) {
-      this.data.myUserId = "user_b"; // 로컬 매칭 시에도 참여자 역할로 확정 락온
+    // 1) 가상 데모 모드이거나 로컬 탭 매칭 모드일 경우 (LocalStorage 공유 가능 시)
+    if (!chosenRole && storedCode && storedCode === cleanCode) {
+      if (this.data.status === 'active') {
+        return { status: 'require_role_choice' };
+      }
+      this.data.myUserId = "user_b";
       this.data.status = 'active';
       this._save();
 
       if (this.syncManager.isActive()) {
         await this.syncManager.updateWalletMeta(this.data.walletId, { status: 'active' });
       }
-      return true;
+      return { status: 'success' };
     }
 
-    if (this.syncManager.isActive()) {
+    if (chosenRole && storedCode && storedCode === cleanCode) {
+      this.data.myUserId = chosenRole;
+      this.data.status = 'active';
+      this._save();
+      return { status: 'success' };
+    }
+
+    // 2) Firebase 활성화 상태이며, 가짜 데모가 아닌 실제 데이터베이스 쿼리
+    if (this.syncManager.isActive() && !this.syncManager.isMockDemo) {
       try {
         console.log("Firestore에서 초대 코드로 지갑 찾는 중...", cleanCode);
         const querySnap = await this.syncManager.db.collection('wallets')
@@ -398,12 +445,29 @@ class JointWalletStore {
         if (!querySnap.empty) {
           const matchedDoc = querySnap.docs[0];
           const matchedWalletId = matchedDoc.id;
-          
+          const dbData = matchedDoc.data();
+
+          if (chosenRole) {
+            this.data.walletId = matchedWalletId;
+            this.data.myUserId = chosenRole;
+            this.data.status = 'active';
+            this.data.walletName = dbData.walletName || this.data.walletName;
+            this.data.users = dbData.users || this.data.users;
+            this.data.categories = dbData.categories || this.data.categories;
+            
+            this._save();
+            this._startFirebaseSync();
+            return { status: 'success' };
+          }
+
+          if (dbData.status === 'active') {
+            return { status: 'require_role_choice' };
+          }
+
           this.data.walletId = matchedWalletId;
           this.data.status = 'active';
-          this.data.myUserId = "user_b"; // 서버 연동 수락 성공 시 B유저 역할로 락온
+          this.data.myUserId = "user_b";
           
-          const dbData = matchedDoc.data();
           const dbUsers = dbData.users || {};
           if (dbUsers.B) {
             dbUsers.B.name = this.data.users.B.name;
@@ -416,7 +480,7 @@ class JointWalletStore {
 
           this._save();
           this._startFirebaseSync();
-          return true;
+          return { status: 'success' };
         } else {
           console.warn("Firestore에서 일치하는 초대 코드를 찾지 못했습니다.");
         }
@@ -425,7 +489,7 @@ class JointWalletStore {
       }
     }
 
-    return false;
+    return { status: 'failed' };
   }
 
   disconnectWallet() {
@@ -438,7 +502,7 @@ class JointWalletStore {
     this.data.transactions = [];
     this.data.assets = this.data.assets.filter(a => a.userId === 'user_a');
     this.data.walletId = null;
-    this.data.myUserId = null; // 기기 역할 해제
+    this.data.myUserId = null;
     this._save();
   }
 
