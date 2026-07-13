@@ -412,7 +412,7 @@ class JointWalletStore {
     // 1) 가상 데모 모드이거나 로컬 탭 매칭 모드일 경우 (LocalStorage 공유 가능 시)
     if (!chosenRole && storedCode && storedCode === cleanCode) {
       if (this.data.status === 'active') {
-        return { status: 'require_role_choice' };
+        return { status: 'require_role_choice', dbData: this.data };
       }
       this.data.myUserId = "user_b";
       this.data.status = 'active';
@@ -459,7 +459,7 @@ class JointWalletStore {
           }
 
           if (dbData.status === 'active') {
-            return { status: 'require_role_choice' };
+            return { status: 'require_role_choice', dbData: dbData };
           }
 
           this.data.walletId = matchedWalletId;

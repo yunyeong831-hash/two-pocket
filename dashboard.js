@@ -307,7 +307,7 @@ export function renderInvitationScreen(userId, container) {
         if (res.status === 'success') {
           showToast(container, "성공적으로 연결되었습니다.");
         } else if (res.status === 'require_role_choice') {
-          showRoleChoiceModal(code, container);
+          showRoleChoiceModal(code, container, res.dbData);
         } else {
           showToast(container, "초대 코드가 유효하지 않습니다.");
         }
@@ -328,7 +328,10 @@ export function renderInvitationScreen(userId, container) {
 }
 
 // 👑 가계부 복원 선택 다이얼로그 모달 모듈
-function showRoleChoiceModal(code, container) {
+function showRoleChoiceModal(code, container, dbData = null) {
+  const nameA = (dbData && dbData.users && dbData.users.A && dbData.users.A.name) ? dbData.users.A.name : "동글이";
+  const nameB = (dbData && dbData.users && dbData.users.B && dbData.users.B.name) ? dbData.users.B.name : "몽글이";
+
   const modal = document.createElement('div');
   modal.style = `
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -347,10 +350,10 @@ function showRoleChoiceModal(code, container) {
       
       <div style="display: flex; flex-direction: column; gap: 8px;">
         <button class="cute-btn primary cute-btn-sm" id="btn-choice-a" style="background-color: var(--color-pink); color: white; width: 100%; font-size: 0.85rem;">
-          동글이 (방장)로 복원하기
+          ${nameA} (방장)로 복원하기
         </button>
         <button class="cute-btn primary cute-btn-sm" id="btn-choice-b" style="background-color: var(--color-green); color: white; width: 100%; font-size: 0.85rem;">
-          몽글이 (파트너)로 복원하기
+          ${nameB} (파트너)로 복원하기
         </button>
         <button class="cute-btn neutral cute-btn-sm" id="btn-choice-cancel" style="width: 100%;">
           취소
@@ -376,14 +379,14 @@ function showRoleChoiceModal(code, container) {
   modal.querySelector('#btn-choice-a').addEventListener('click', () => {
     store.acceptInvitation(code, 'user_a').then(() => {
       modal.remove();
-      showToast(container, "동글이로 복원되었습니다.");
+      showToast(container, `${nameA}로 복원되었습니다.`);
     });
   });
   
   modal.querySelector('#btn-choice-b').addEventListener('click', () => {
     store.acceptInvitation(code, 'user_b').then(() => {
       modal.remove();
-      showToast(container, "몽글이로 복원되었습니다.");
+      showToast(container, `${nameB}로 복원되었습니다.`);
     });
   });
   
@@ -448,10 +451,7 @@ export function renderHomeTab(userId, container) {
         <span style="font-size: 0.75rem; color: #D9EBFF;">공유 포켓 기준</span>
       </div>
       <div class="total-asset-val">${formatMoney(summary.totalJointAsset)}</div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-        <span style="font-size: 0.8rem; color: #D9EBFF;">전월 대비 +1,280,000원</span>
-        <span class="trend-badge up" style="font-size: 0.75rem; padding: 2px 6px;">▲ 1.1%</span>
-      </div>
+      <div style="margin-top: 8px;"></div>
     </div>
 
     <!-- 소비 요약 카드 -->
@@ -605,10 +605,7 @@ function renderAssetListScreen(userId, container) {
         <span style="font-size:0.75rem; color:var(--color-text-muted);">공유 포켓 기준</span>
       </div>
       <div class="total-asset-val" style="margin: 8px 0;">${formatMoney(store.getFinancialSummary(userId).totalJointAsset)}</div>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; border-bottom: 1px solid var(--color-border); padding-bottom: 12px;">
-        <span style="font-size:0.8rem; color:var(--color-text-muted);">전월 대비 +3,200,000원</span>
-        <span style="font-size:0.75rem; font-weight:700; color:var(--color-red);">↑ 1.1%</span>
-      </div>
+      <div style="margin-bottom: 12px; border-bottom: 1px solid var(--color-border); padding-bottom: 4px;"></div>
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; font-size:0.85rem;">
         <div>
           <span style="color:var(--color-text-muted); display:block; font-size:0.75rem;">내 포켓</span>
@@ -964,7 +961,7 @@ function renderAssetDetailScreen(userId, container, assetId) {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
           <span style="font-size:0.75rem; color:var(--color-text-muted);">포켓 유형 · 소유주</span>
           <span style="font-size:0.75rem; color:var(--color-text-muted); font-weight:600;">
-            ${asset.userId === 'user_a' ? '동글이' : '몽글이'} (${asset.isShared ? '공유 중' : '나만 보기'})
+            ${ownerName} (${asset.isShared ? '공유 중' : '나만 보기'})
           </span>
         </div>
         <div style="font-size: 1.4rem; font-weight: 700; color: var(--color-text); margin-bottom: 8px;">
