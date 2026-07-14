@@ -7,9 +7,10 @@ const assetSubViewState = {
   user_b: { mode: 'list', editId: null, detailId: null }
 };
 
+const currentDate = new Date();
 const txSubViewState = {
-  user_a: { mode: 'list' }, // 'list' | 'categories'
-  user_b: { mode: 'list' }
+  user_a: { mode: 'list', year: currentDate.getFullYear(), month: currentDate.getMonth() + 1, detailId: null, editId: null },
+  user_b: { mode: 'list', year: currentDate.getFullYear(), month: currentDate.getMonth() + 1, detailId: null, editId: null }
 };
 
 const ASSET_TYPE_META = {
@@ -31,6 +32,115 @@ export function showToast(container, message) {
   toast.innerHTML = `<span>${message}</span>`;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 2200);
+}
+
+// 개별 거래 내역 아이템 HTML 생성 헬퍼 (포켓 이름 히든 여부 처리)
+export function renderTxItemHtml(tx, userId, partnerName, categories, hidePocketName = false) {
+  let typeLabel = '';
+  let typeClass = '';
+  let categoryText = '';
+  let displayMemo = tx.memo || "-";
+  let txColor = 'var(--color-text)';
+  let sign = '';
+
+  const catMeta = categories.find(c => c.id === tx.category) || { emoji: "🎈", name: "기타" };
+
+  // 자산 이름 조회
+  const fromName = store.data.assets.find(a => a.id === tx.linkedAssetId)?.name;
+  const toName = store.data.assets.find(a => a.id === tx.targetAssetId)?.name;
+
+  if (tx.type === 'transfer') {
+    const isFromMe = tx.linkedAssetId && store.data.assets.find(a => a.id === tx.linkedAssetId)?.userId === userId;
+    typeLabel = isFromMe ? '이체 출금' : '이체 입금';
+    typeClass = isFromMe ? 'blue' : 'mint';
+    txColor = isFromMe ? 'var(--color-red)' : 'var(--color-green)';
+    sign = isFromMe ? '-' : '+';
+
+    if (hidePocketName) {
+      categoryText = '이체';
+      if (tx.linkedAssetId && store.data.assets.find(a => a.id === tx.linkedAssetId)?.userId === userId) {
+        displayMemo = tx.memo ? `받는 포켓: ${toName || "포켓"} (메모: ${tx.memo})` : `받는 포켓: ${toName || "포켓"}`;
+      } else {
+        displayMemo = tx.memo ? `보낸 포켓: ${fromName || "포켓"} (메모: ${tx.memo})` : `보낸 포켓: ${fromName || "포켓"}`;
+      }
+    } else {
+      categoryText = `이체 · 👛 ${fromName || "포켓"} → ${toName || "포켓"}`;
+      displayMemo = tx.memo || "-";
+    }
+  } else {
+    categoryText = `${catMeta.emoji} ${catMeta.name}`;
+    if (!hidePocketName && fromName) {
+      categoryText += ` · 👛 ${fromName}`;
+    }
+
+    if (tx.type === 'expense') {
+      typeLabel = '지출';
+      typeClass = 'pink';
+      txColor = 'var(--color-red)';
+      sign = '-';
+    } else {
+      typeLabel = '수입';
+      typeClass = 'mint';
+      txColor = 'var(--color-green)';
+      sign = '+';
+    }
+
+    if (tx.id.startsWith('tx_adjust_')) {
+      typeLabel = '잔액 보정';
+      typeClass = 'blue';
+      categoryText = '잔액 보정';
+      if (!hidePocketName && fromName) {
+        categoryText += ` · 👛 ${fromName}`;
+      }
+      displayMemo = tx.memo || "-";
+    }
+  }
+
+  return `
+    <div class="tx-item-row" data-id="${tx.id}" style="cursor: pointer; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 10px 0; border-bottom: 1px solid #F2F4F6;">
+      <!-- 1번째 줄: [구분] 카테고리 / 금액 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="sticker ${typeClass}" style="margin-bottom: 0; font-size: 0.72rem; padding: 2px 6px;">${typeLabel}</span>
+          <span style="font-size: 0.82rem; font-weight: 600; color: var(--color-text-light);">${categoryText}</span>
+        </div>
+        <span class="item-value" style="color: ${txColor}; font-weight: 700; font-size: 0.95rem;">
+          ${sign}${formatMoney(tx.amount)}
+        </span>
+      </div>
+      <!-- 2번째 줄: 메모 / 기록자 배지 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span style="font-size: 0.82rem; color: var(--color-text); font-weight: 500; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          ${displayMemo}
+        </span>
+        <span style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 500;">
+          ${tx.date} · ${tx.userId === userId ? '나' : partnerName} · ${tx.isShared ? '공유' : '비공개'}
+        </span>
+      </div>
+    </div>
+  `;
+}
+
+// 금액 입력 시 천단위 콤마 자동 포맷팅 헬퍼
+export function setupAmountInputFormatting(inputElement) {
+  if (!inputElement) return;
+
+  // 초기값 포맷팅 (기존 세팅된 숫자가 있으면 콤마 포맷으로 변환)
+  if (inputElement.value) {
+    const rawVal = inputElement.value.replace(/[^0-9]/g, '');
+    if (rawVal) {
+      inputElement.value = Number(rawVal).toLocaleString('ko-KR');
+    }
+  }
+
+  inputElement.addEventListener('input', (e) => {
+    let value = e.target.value.replace(/[^0-9]/g, '');
+    if (value) {
+      e.target.value = Number(value).toLocaleString('ko-KR');
+    } else {
+      e.target.value = '';
+    }
+  });
 }
 
 // 🌐 랜딩 및 초대대기 화면에서 사용할 Firebase 설정 공용 모달 팝업
@@ -252,7 +362,10 @@ export function renderLandingScreen(userId, container) {
           <input type="text" class="cute-input" id="join-invite-code" placeholder="SWEET-XXXXXX" style="text-align: center; text-transform: uppercase; font-weight:700; margin-bottom: 12px;">
 
           <label class="cute-label" style="font-size: 0.8rem; margin-bottom: 6px;">개인 비밀번호 (숫자 4자리)</label>
-          <input type="password" class="cute-input" id="join-user-pin" placeholder="숫자 4자리 입력" maxlength="4" pattern="[0-8]*" inputmode="numeric" style="text-align: center; font-size:1.2rem; letter-spacing:8px;">
+          <input type="password" class="cute-input" id="join-user-pin" placeholder="숫자 4자리 입력" maxlength="4" pattern="[0-8]*" inputmode="numeric" style="text-align: center; font-size:1.2rem; letter-spacing:8px; margin-bottom: 4px;">
+          <p style="font-size:0.7rem; color:var(--color-text-muted); line-height:1.4; margin-top:2px; margin-bottom:0; text-align:left;">
+            ℹ️ 비밀번호를 잊어버렸을 땐 파트너의 마이 페이지에서 비밀번호를 초기화할 수 있습니다.
+          </p>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:8px;">
@@ -283,6 +396,8 @@ export function renderLandingScreen(userId, container) {
         } else if (res.status === 'require_role_choice') {
           // 이미 기존에 생성 및 매칭 완료된 방일 때 역할 선택 복원 팝업으로 연계
           showRoleChoiceModal(code, container, res.dbData);
+        } else if (res.status === 'pin_failed') {
+          showToast(container, "비밀번호가 일치하지 않습니다.");
         } else {
           showToast(container, "초대 코드가 유효하지 않습니다.");
         }
@@ -393,6 +508,8 @@ export function renderInvitationScreen(userId, container) {
           showToast(container, "성공적으로 연결되었습니다.");
         } else if (res.status === 'require_role_choice') {
           showRoleChoiceModal(code, container, res.dbData);
+        } else if (res.status === 'pin_failed') {
+          showToast(container, "비밀번호가 일치하지 않습니다.");
         } else {
           showToast(container, "초대 코드가 유효하지 않습니다.");
         }
@@ -653,36 +770,17 @@ export function renderHomeTab(userId, container) {
     timelineList.innerHTML = `<div style="text-align:center; padding:16px; font-size:0.85rem; color:var(--color-text-muted);">최근 거래 내역이 없습니다.</div>`;
   } else {
     timelineList.innerHTML = txs.map(tx => {
-      const isMyTx = tx.userId === userId;
-      let title = tx.memo;
-      let txColor = 'var(--color-text)';
-      let sign = '';
-
-      if (tx.type === 'transfer') {
-        const fromAsset = store.data.assets.find(a => a.id === tx.linkedAssetId)?.name || "포켓";
-        const toAsset = store.data.assets.find(a => a.id === tx.targetAssetId)?.name || "포켓";
-        title = tx.memo ? `${tx.memo} (이체)` : `${fromAsset} → ${toAsset}`;
-        txColor = 'var(--color-text-light)';
-        sign = '⇄ ';
-      } else {
-        const catMeta = allCategories.find(c => c.id === tx.category) || { emoji: "🎈", name: "기타" };
-        title = `${catMeta.emoji} ${tx.memo || catMeta.name}`;
-        txColor = tx.type === 'expense' ? 'var(--color-red)' : 'var(--color-green)';
-        sign = tx.type === 'expense' ? '-' : '+';
-      }
-
-      return `
-        <div class="item-row">
-          <div class="item-info">
-            <span class="item-title">${title}</span>
-            <span class="item-sub">${tx.date} · ${isMyTx ? '나' : summary.partnerName}</span>
-          </div>
-          <div class="item-value" style="color: ${txColor};">
-            ${sign}${formatMoney(tx.amount)}
-          </div>
-        </div>
-      `;
+      return renderTxItemHtml(tx, userId, summary.partnerName, allCategories, false);
     }).join('');
+
+    timelineList.querySelectorAll('.tx-item-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        txSubViewState[userId].mode = 'detail';
+        txSubViewState[userId].detailId = id;
+        document.querySelector('.nav-btn[data-tab="txs"]').click();
+      });
+    });
   }
 
   container.querySelector('#total-asset-box').addEventListener('click', () => {
@@ -787,7 +885,7 @@ function renderAssetListScreen(userId, container) {
     <!-- 3. 자산 항목 리스트 -->
     <div class="cute-card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
-        <h4 style="font-weight:700; font-size:1rem;">보관 포켓 목록</h4>
+        <h4 style="font-weight:700; font-size:1rem;">내 포켓</h4>
         <button class="cute-btn primary cute-btn-sm" id="btn-go-add-asset" style="padding: 6px 12px; font-size:0.8rem;">새 포켓 추가</button>
       </div>
       
@@ -800,7 +898,7 @@ function renderAssetListScreen(userId, container) {
 
     <!-- 4. 상대방이 공유한 자산 -->
     <div class="cute-card">
-      <div class="sticker mint">${partnerName}님이 오픈한 포켓</div>
+      <div class="sticker mint">파트너 포켓</div>
       <div id="partner-assets-list"></div>
     </div>
   `;
@@ -818,28 +916,36 @@ function renderAssetListScreen(userId, container) {
     myContainer.innerHTML = myAssets.map(a => {
       const typeMeta = ASSET_TYPE_META[a.type] || { name: "기타 포켓", emoji: "📁" };
       return `
-        <div class="item-row" style="cursor: pointer;">
-          <div class="item-info asset-click-area" data-id="${a.id}" style="flex: 1; padding: 4px 0;">
-            <span class="item-title" style="text-decoration: underline; text-underline-offset: 4px; color: var(--color-blue);">${a.name} ›</span>
-            <span class="item-sub">
-              ${typeMeta.name} · 내 포켓
+        <div class="item-row" style="display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 0; border-bottom: 1px solid #F2F4F6;">
+          <!-- 1번째 줄: 포켓이름 / 포켓자산유형 -->
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div class="asset-click-area" data-id="${a.id}" style="cursor: pointer; flex: 1; padding: 2px 0;">
+              <span class="item-title" style="text-decoration: underline; text-underline-offset: 4px; color: var(--color-blue); font-size: 0.92rem; font-weight: 600;">${a.name} ›</span>
+            </div>
+            <span class="item-sub" style="font-size: 0.78rem; color: var(--color-text-muted); font-weight: 500;">
+              ${typeMeta.emoji} ${typeMeta.name}
             </span>
           </div>
-          <div style="display:flex; align-items:center; gap: 14px;">
-            <span class="item-value" style="color: ${a.type === 'loan' ? 'var(--color-red)' : 'inherit'};">
+          <!-- 2번째 줄: 금액 / 공유토글, 수정, 삭제 -->
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span class="item-value" style="font-size: 1rem; font-weight: 700; color: ${a.type === 'loan' ? 'var(--color-red)' : 'inherit'};">
               ${a.type === 'loan' ? '-' : ''}${formatMoney(a.amount)}
             </span>
             
-            <div style="display:flex; align-items:center; gap:4px;">
-              <span style="font-size:0.72rem; font-weight:600; color:var(--color-text-light);">${a.isShared ? '공유' : '숨김'}</span>
-              <label class="cute-switch" style="transform: scale(0.85); width:40px;">
-                <input type="checkbox" class="asset-share-toggle-switch" data-id="${a.id}" ${a.isShared ? 'checked' : ''}>
-                <span class="slider"></span>
-              </label>
-            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <!-- 공유토글 -->
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span style="font-size: 0.72rem; font-weight: 600; color: var(--color-text-light);">${a.isShared ? '공유' : '숨김'}</span>
+                <label class="cute-switch" style="transform: scale(0.8); width: 40px; display: inline-block;">
+                  <input type="checkbox" class="asset-share-toggle-switch" data-id="${a.id}" ${a.isShared ? 'checked' : ''}>
+                  <span class="slider"></span>
+                </label>
+              </div>
 
-            <button class="cute-btn cute-btn-sm secondary btn-edit-asset-go" data-id="${a.id}" style="padding: 4px 8px; font-size:0.75rem;">수정</button>
-            <button class="cute-btn cute-btn-sm neutral btn-delete-asset" data-id="${a.id}" style="color: var(--color-red); padding: 4px 8px; font-size:0.75rem;">삭제</button>
+              <!-- 수정 / 삭제 버튼 -->
+              <button class="cute-btn cute-btn-sm secondary btn-edit-asset-go" data-id="${a.id}" style="padding: 4px 8px; font-size: 0.75rem;">수정</button>
+              <button class="cute-btn cute-btn-sm neutral btn-delete-asset" data-id="${a.id}" style="color: var(--color-red); padding: 4px 8px; font-size: 0.75rem;">삭제</button>
+            </div>
           </div>
         </div>
       `;
@@ -852,14 +958,23 @@ function renderAssetListScreen(userId, container) {
     partnerContainer.innerHTML = partnerAssets.map(a => {
       const typeMeta = ASSET_TYPE_META[a.type] || { name: "기타 포켓", emoji: "📁" };
       return `
-        <div class="item-row" style="cursor: pointer;">
-          <div class="item-info asset-click-area" data-id="${a.id}" style="flex: 1; padding: 4px 0;">
-            <span class="item-title" style="text-decoration: underline; text-underline-offset: 4px; color: var(--color-blue);">${a.name} ›</span>
-            <span class="item-sub">${typeMeta.name} · ${partnerName} 포켓</span>
+        <div class="item-row" style="display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 0; border-bottom: 1px solid #F2F4F6;">
+          <!-- 1번째 줄: 포켓이름 / 포켓자산유형 -->
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div class="asset-click-area" data-id="${a.id}" style="cursor: pointer; flex: 1; padding: 2px 0;">
+              <span class="item-title" style="text-decoration: underline; text-underline-offset: 4px; color: var(--color-blue); font-size: 0.92rem; font-weight: 600;">${a.name} ›</span>
+            </div>
+            <span class="item-sub" style="font-size: 0.78rem; color: var(--color-text-muted); font-weight: 500;">
+              ${typeMeta.emoji} ${typeMeta.name}
+            </span>
           </div>
-          <span class="item-value" style="color: ${a.type === 'loan' ? 'var(--color-red)' : 'inherit'};">
-            ${a.type === 'loan' ? '-' : ''}${formatMoney(a.amount)}
-          </span>
+          <!-- 2번째 줄: 금액 / 공유 여부 표시 -->
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <span class="item-value" style="font-size: 1rem; font-weight: 700; color: ${a.type === 'loan' ? 'var(--color-red)' : 'inherit'};">
+              ${a.type === 'loan' ? '-' : ''}${formatMoney(a.amount)}
+            </span>
+            <span style="font-size: 0.72rem; color: var(--color-text-muted); font-weight: 500;">${partnerName} 공유</span>
+          </div>
         </div>
       `;
     }).join('');
@@ -929,7 +1044,7 @@ function renderAssetAddScreen(userId, container) {
         </select>
 
         <label class="cute-label">현재 잔액</label>
-        <input type="number" class="cute-input" id="new-asset-amount" placeholder="금액 입력" required>
+        <input type="text" class="cute-input" id="new-asset-amount" placeholder="금액 입력" required>
 
         <label class="cute-label">메모 (선택)</label>
         <input type="text" class="cute-input" id="new-asset-memo" placeholder="상세 용도 메모">
@@ -964,6 +1079,8 @@ function renderAssetAddScreen(userId, container) {
     renderAssetsTab(userId, container);
   };
 
+  setupAmountInputFormatting(container.querySelector('#new-asset-amount'));
+
   container.querySelector('#btn-back-to-list').addEventListener('click', goBack);
   container.querySelector('#btn-cancel-add').addEventListener('click', goBack);
 
@@ -971,7 +1088,7 @@ function renderAssetAddScreen(userId, container) {
     e.preventDefault();
     const name = container.querySelector('#new-asset-name').value;
     const type = container.querySelector('#new-asset-type').value;
-    const amount = container.querySelector('#new-asset-amount').value;
+    const amount = Number(container.querySelector('#new-asset-amount').value.replace(/,/g, ''));
     const memo = container.querySelector('#new-asset-memo').value;
     const isShared = container.querySelector('#new-asset-shared').checked;
     const hideFromTotal = container.querySelector('#new-asset-hidetotal').checked;
@@ -1010,7 +1127,7 @@ function renderAssetEditScreen(userId, container, assetId) {
         </select>
 
         <label class="cute-label">현재 잔액</label>
-        <input type="number" class="cute-input" id="edit-asset-amount" value="${asset.amount}" required>
+        <input type="text" class="cute-input" id="edit-asset-amount" value="${asset.amount}" required>
 
         <label class="cute-label">메모 (선택)</label>
         <input type="text" class="cute-input" id="edit-asset-memo" value="${asset.memo || ''}">
@@ -1045,6 +1162,8 @@ function renderAssetEditScreen(userId, container, assetId) {
     renderAssetsTab(userId, container);
   };
 
+  setupAmountInputFormatting(container.querySelector('#edit-asset-amount'));
+
   container.querySelector('#btn-back-to-list-edit').addEventListener('click', goBack);
   container.querySelector('#btn-cancel-edit').addEventListener('click', goBack);
 
@@ -1052,7 +1171,7 @@ function renderAssetEditScreen(userId, container, assetId) {
     e.preventDefault();
     const name = container.querySelector('#edit-asset-name').value;
     const type = container.querySelector('#edit-asset-type').value;
-    const newAmount = Number(container.querySelector('#edit-asset-amount').value);
+    const newAmount = Number(container.querySelector('#edit-asset-amount').value.replace(/,/g, ''));
     const memo = container.querySelector('#edit-asset-memo').value;
     const isShared = container.querySelector('#edit-asset-shared').checked;
     const hideFromTotal = container.querySelector('#edit-asset-hidetotal').checked;
@@ -1088,6 +1207,7 @@ function renderAssetDetailScreen(userId, container, assetId) {
   const partnerId = userId === 'user_a' ? 'user_b' : 'user_a';
   const partnerName = store.data.users[partnerId]?.name || "상대방";
   const typeMeta = ASSET_TYPE_META[asset.type] || { name: "기타", emoji: "📁" };
+  const ownerName = asset.userId === userId ? "나" : partnerName;
 
   const relatedTxs = store.data.transactions
     .filter(tx => tx.linkedAssetId === assetId || tx.targetAssetId === assetId)
@@ -1123,52 +1243,19 @@ function renderAssetDetailScreen(userId, container, assetId) {
   if (relatedTxs.length === 0) {
     timelineContainer.innerHTML = `<div style="text-align:center; padding:24px; font-size:0.85rem; color:var(--color-text-muted);">연관된 거래 내역이 없습니다.</div>`;
   } else {
+    const allCategories = store.getCategories();
     timelineContainer.innerHTML = relatedTxs.map(tx => {
-      let displayTitle = tx.memo || "내용 없음";
-      let txColor = 'var(--color-text)';
-      let sign = '';
-      let subDesc = `${tx.date} · ${tx.userId === userId ? '나' : partnerName}`;
-
-      if (tx.type === 'transfer') {
-        const fromName = store.data.assets.find(a => a.id === tx.linkedAssetId)?.name || "포켓";
-        const toName = store.data.assets.find(a => a.id === tx.targetAssetId)?.name || "포켓";
-
-        if (tx.linkedAssetId === assetId) {
-          displayTitle = tx.memo ? `${tx.memo} (이체 출금)` : `→ ${toName} (이체)`;
-          txColor = 'var(--color-red)';
-          sign = '-';
-        } else {
-          displayTitle = tx.memo ? `${tx.memo} (이체 입금)` : `← ${fromName} (이체)`;
-          txColor = 'var(--color-green)';
-          sign = '+';
-        }
-      } else {
-        if (tx.type === 'expense') {
-          txColor = 'var(--color-red)';
-          sign = '-';
-        } else {
-          txColor = 'var(--color-green)';
-          sign = '+';
-        }
-
-        if (tx.id.startsWith('tx_adjust_')) {
-          displayTitle = `⚙️ ${tx.memo}`;
-          subDesc += ` · ${tx.includeInSummary ? '통계 포함' : '통계 제외'}`;
-        }
-      }
-
-      return `
-        <div class="item-row" style="padding: 10px 0; border-bottom: 1px solid #F2F4F6;">
-          <div class="item-info">
-            <span class="item-title" style="font-size:0.88rem; font-weight:600;">${displayTitle}</span>
-            <span class="item-sub" style="font-size:0.75rem;">${subDesc}</span>
-          </div>
-          <div class="item-value" style="color: ${txColor}; font-weight: 700; font-size:0.9rem;">
-            ${sign}${formatMoney(tx.amount)}
-          </div>
-        </div>
-      `;
+      return renderTxItemHtml(tx, userId, partnerName, allCategories, true);
     }).join('');
+
+    timelineContainer.querySelectorAll('.tx-item-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        txSubViewState[userId].mode = 'detail';
+        txSubViewState[userId].detailId = id;
+        document.querySelector('.nav-btn[data-tab="txs"]').click();
+      });
+    });
   }
 
   container.querySelector('#btn-back-from-detail').addEventListener('click', () => {
@@ -1177,6 +1264,7 @@ function renderAssetDetailScreen(userId, container, assetId) {
   });
 }
 
+// 📝 [거래 내역 및 소비 기록 탭] 렌더러
 // 📝 [거래 내역 및 소비 기록 탭] 렌더러
 export function renderTxsTab(userId, container) {
   if (store.data.status === 'landing') {
@@ -1191,30 +1279,203 @@ export function renderTxsTab(userId, container) {
   assetSubViewState[userId] = { mode: 'list', editId: null, detailId: null };
 
   const state = txSubViewState[userId];
+  if (!state.year || !state.month) {
+    const today = new Date();
+    state.year = today.getFullYear();
+    state.month = today.getMonth() + 1;
+  }
+
   if (state.mode === 'categories') {
     renderCategoriesManagementScreen(userId, container);
+  } else if (state.mode === 'add') {
+    renderTxAddScreen(userId, container);
+  } else if (state.mode === 'detail') {
+    renderTxDetailScreen(userId, container, state.detailId);
+  } else if (state.mode === 'edit') {
+    renderTxEditScreen(userId, container, state.editId);
   } else {
     renderTxsMainScreen(userId, container);
   }
 }
 
-// [거래 - 메인 거래 리스트 및 등록 폼]
+// [거래 - 메인 거래 리스트 및 월 네비게이션]
 function renderTxsMainScreen(userId, container) {
-  const myAssets = store.data.assets.filter(a => a.userId === userId);
-  const partnerId = userId === 'user_a' ? 'user_b' : 'user_a';
-  const partnerName = store.data.users[partnerId]?.name || "상대방";
-  const categories = store.getCategories();
+  const state = txSubViewState[userId];
+  if (state.searchQuery === undefined) {
+    state.searchQuery = "";
+  }
 
   container.innerHTML = `
-    <!-- 상단 카테고리 편집 링크 바 -->
-    <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
-      <button class="cute-btn neutral cute-btn-sm" id="btn-go-categories-edit" style="font-size:0.8rem; padding: 6px 12px;">⚙️ 카테고리 설정</button>
+    <!-- 1. 상단 월 네비게이션 및 기록 추가 버튼 -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <!-- 월 이동 네비게이션 -->
+      <div style="display: flex; align-items: center; gap: 14px; background: white; border: 1px solid var(--color-border); padding: 4px 12px; border-radius: 20px; box-shadow: var(--box-shadow-cute);">
+        <button class="cute-btn neutral cute-btn-sm" id="btn-prev-month" style="padding: 2px 6px; font-weight: 700; border-radius: 50%; font-size: 0.95rem; border: none; background: none;">‹</button>
+        <span style="font-weight: 700; font-size: 0.9rem; min-width: 80px; text-align: center; color: var(--color-text);" id="label-current-month">
+          ${state.year}년 ${state.month}월
+        </span>
+        <button class="cute-btn neutral cute-btn-sm" id="btn-next-month" style="padding: 2px 6px; font-weight: 700; border-radius: 50%; font-size: 0.95rem; border: none; background: none;">›</button>
+      </div>
+      
+      <!-- 기록 추가 버튼 -->
+      <button class="cute-btn primary cute-btn-sm" id="btn-go-add-tx" style="font-size:0.8rem; padding: 6px 12px; border-radius: 20px; box-shadow: 0px 2px 8px rgba(49, 130, 246, 0.15);">✍️ 기록 추가</button>
     </div>
 
-    <!-- 소비/이체 기록 폼 -->
-    <div class="cute-card" style="background-color: #FAFBFB;">
-      <div class="sticker mint">오늘의 소비 기록하기</div>
+    <!-- 2. 검색 기능 -->
+    <div style="margin-bottom: 16px;">
+      <input type="text" class="cute-input" id="tx-search-input" placeholder="🔍 메모, 카테고리, 금액, 포켓 이름 검색..." value="${state.searchQuery || ''}" style="margin-bottom: 0; padding: 8px 14px; font-size: 0.85rem; border-radius: 12px; height: 38px;">
+    </div>
+
+    <!-- 3. 타임라인 (상단 '거래 내역' 스티커 삭제) -->
+    <div class="cute-card" style="padding-top: 18px;">
+      <div id="txs-list"></div>
+    </div>
+  `;
+
+  // 월 네비게이션 및 탭 이동 이벤트 바인딩
+  container.querySelector('#btn-prev-month').addEventListener('click', () => {
+    state.month--;
+    if (state.month === 0) {
+      state.month = 12;
+      state.year--;
+    }
+    renderTxsTab(userId, container);
+  });
+
+  container.querySelector('#btn-next-month').addEventListener('click', () => {
+    state.month++;
+    if (state.month === 13) {
+      state.month = 1;
+      state.year++;
+    }
+    renderTxsTab(userId, container);
+  });
+
+  container.querySelector('#btn-go-add-tx').addEventListener('click', () => {
+    state.mode = 'add';
+    renderTxsTab(userId, container);
+  });
+
+  const searchInput = container.querySelector('#tx-search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      state.searchQuery = e.target.value;
+      renderTxList();
+    });
+  }
+
+  // 거래 내역 목록 렌더링
+  const renderTxList = () => {
+    const txsListContainer = container.querySelector('#txs-list');
+    const txs = store.getTransactions(userId);
+    const categories = store.getCategories();
+    const query = (state.searchQuery || "").toLowerCase().trim();
+
+    // 필터링: 선택된 년/월 + 검색어 매칭
+    const filteredTxs = txs.filter(tx => {
+      // 1. 월/년도 일치여부 확인
+      const dateParts = tx.date.split('-');
+      if (dateParts.length >= 2) {
+        const y = Number(dateParts[0]);
+        const m = Number(dateParts[1]);
+        if (y !== state.year || m !== state.month) {
+          return false;
+        }
+      } else {
+        return false;
+      }
+
+      // 2. 검색어 매칭 확인
+      if (query) {
+        const catMeta = categories.find(c => c.id === tx.category) || { emoji: "🎈", name: "기타" };
+        const fromName = store.data.assets.find(a => a.id === tx.linkedAssetId)?.name || "";
+        const toName = store.data.assets.find(a => a.id === tx.targetAssetId)?.name || "";
+
+        const memoMatch = (tx.memo || "").toLowerCase().includes(query);
+        const catMatch = catMeta.name.toLowerCase().includes(query);
+        const amountMatch = String(tx.amount).includes(query);
+        const fromMatch = fromName.toLowerCase().includes(query);
+        const toMatch = toName.toLowerCase().includes(query);
+
+        return memoMatch || catMatch || amountMatch || fromMatch || toMatch;
+      }
+
+      return true;
+    });
+
+    if (filteredTxs.length === 0) {
+      txsListContainer.innerHTML = `<div style="text-align:center; padding:32px 16px; color:var(--color-text-muted); font-size:0.85rem;">거래 내역이 없습니다.</div>`;
+      return;
+    }
+
+    // 날짜별 내림차순 정렬
+    filteredTxs.sort((a, b) => new Date(b.date) - new Date(a.date) || b.id.localeCompare(a.id));
+
+    // 일단위 그룹화
+    const grouped = {};
+    filteredTxs.forEach(tx => {
+      const d = tx.date;
+      if (!grouped[d]) {
+        grouped[d] = [];
+      }
+      grouped[d].push(tx);
+    });
+
+    const uniqueDates = Object.keys(grouped).sort((a, b) => new Date(b) - new Date(a));
+    const partnerId = userId === 'user_a' ? 'user_b' : 'user_a';
+    const partnerName = store.data.users[partnerId]?.name || "상대방";
+
+    txsListContainer.innerHTML = uniqueDates.map(dateStr => {
+      const dObj = new Date(dateStr);
+      const days = ["일", "월", "화", "수", "목", "금", "토"];
+      const formattedDate = `${dObj.getMonth() + 1}월 ${dObj.getDate()}일 (${days[dObj.getDay()]})`;
+
+      const txsHtml = grouped[dateStr].map(tx => {
+        return renderTxItemHtml(tx, userId, partnerName, categories, false);
+      }).join('');
+
+      return `
+        <div class="tx-date-group" style="margin-bottom: 20px;">
+          <!-- 일자 헤더 -->
+          <div style="font-weight: 700; font-size: 0.88rem; color: var(--color-blue); background: var(--color-blue-bg); padding: 4px 10px; border-radius: 12px; display: inline-block; margin-bottom: 6px;">
+            📅 ${formattedDate}
+          </div>
+          <div style="padding-left: 4px;">
+            ${txsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 클릭 시 상세 화면 이동 이벤트 바인딩
+    txsListContainer.querySelectorAll('.tx-item-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        state.mode = 'detail';
+        state.detailId = id;
+        renderTxsTab(userId, container);
+      });
+    });
+  };
+
+  renderTxList();
+}
+
+// ✍️ [거래 - 기록 추가 화면]
+function renderTxAddScreen(userId, container) {
+  const myAssets = store.data.assets.filter(a => a.userId === userId);
+  const categories = store.getCategories();
+  const state = txSubViewState[userId];
+
+  container.innerHTML = `
+    <div class="cute-card">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom: 16px; border-bottom: 1px solid var(--color-border); padding-bottom:12px;">
+        <button class="cute-btn neutral cute-btn-sm" id="btn-add-tx-back" style="padding:4px 8px;">‹ 뒤로</button>
+        <h3 class="cute-card-title" style="margin-bottom:0; font-size:1.1rem;">소비 기록하기</h3>
+      </div>
+
       <form id="form-add-tx" style="margin-top: 12px;">
+        <!-- Row 1: 날짜 & 구분 -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div>
             <label class="cute-label">날짜</label>
@@ -1230,54 +1491,58 @@ function renderTxsMainScreen(userId, container) {
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-          <div>
-            <label class="cute-label">금액</label>
-            <input type="number" class="cute-input" id="tx-amount" placeholder="금액 입력" required>
-          </div>
-          <div>
-            <label class="cute-label">내용 (선택)</label>
-            <input type="text" class="cute-input" id="tx-memo" placeholder="예: 저녁 외식, 마트 장보기 등">
-          </div>
-        </div>
-
-        <!-- 조건부 필드 영역: 수입/지출 시 카테고리 & 자산 선택 -->
+        <!-- Row 2: 카테고리 & 연동할 포켓 (수입/지출일 때) -->
         <div id="regular-tx-fields" style="display: block;">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div>
-              <label class="cute-label">카테고리</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="cute-label" style="margin-bottom: 0;">카테고리</label>
+                <button type="button" class="cute-btn neutral cute-btn-sm" id="btn-go-categories-edit-from-add" style="font-size: 0.72rem; padding: 2px 8px; border-radius: 8px;">⚙️ 설정</button>
+              </div>
               <select class="cute-select" id="tx-category">
                 ${categories.map(c => `<option value="${c.id}">${c.emoji} ${c.name}</option>`).join('')}
               </select>
             </div>
             <div>
-              <label class="cute-label">연동할 내 포켓 (선택)</label>
-              <select class="cute-select" id="tx-asset">
-                <option value="">연동 안 함</option>
+              <label class="cute-label">연동할 내 포켓</label>
+              <select class="cute-select" id="tx-asset" required>
+                <option value="">선택해 주세요</option>
                 ${myAssets.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
               </select>
             </div>
           </div>
         </div>
 
-        <!-- 조건부 필드 영역: 이체(transfer) 선택 시 활성화 -->
+        <!-- Row 2: 보내는 포켓 & 받는 포켓 (이체일 때) -->
         <div id="transfer-tx-fields" style="display: none; background: #FFFDF9; border: 1px dashed var(--color-border); padding: 14px; border-radius: var(--border-radius-md); margin-bottom: 12px;">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div>
               <label class="cute-label" style="color:var(--color-red);">보내는 포켓 📤</label>
-              <select class="cute-select" id="tx-from-asset" style="margin-bottom:0;">
+              <select class="cute-select" id="tx-from-asset" required style="margin-bottom:0;">
                 <option value="">선택해 주세요</option>
                 ${myAssets.map(a => `<option value="${a.id}">${a.name} (${formatMoney(a.amount)})</option>`).join('')}
               </select>
             </div>
             <div>
               <label class="cute-label" style="color:var(--color-green);">받는 포켓 📥</label>
-              <select class="cute-select" id="tx-to-asset" style="margin-bottom:0;">
+              <select class="cute-select" id="tx-to-asset" required style="margin-bottom:0;">
                 <option value="">선택해 주세요</option>
                 ${myAssets.map(a => `<option value="${a.id}">${a.name} (${formatMoney(a.amount)})</option>`).join('')}
               </select>
             </div>
           </div>
+        </div>
+
+        <!-- Row 3: 금액 -->
+        <div>
+          <label class="cute-label">금액</label>
+          <input type="text" class="cute-input" id="tx-amount" placeholder="금액 입력" required>
+        </div>
+
+        <!-- Row 4: 내용 -->
+        <div>
+          <label class="cute-label">내용 (선택)</label>
+          <input type="text" class="cute-input" id="tx-memo" placeholder="예: 저녁 외식, 마트 장보기 등">
         </div>
 
         <div style="display:flex; align-items:center; background: #FAFBFB; border:1px solid var(--color-border); border-radius:var(--border-radius-md); padding: 12px; margin-bottom: 16px;">
@@ -1293,106 +1558,62 @@ function renderTxsMainScreen(userId, container) {
         <button type="submit" class="cute-btn primary" style="width: 100%;">기록 완료</button>
       </form>
     </div>
-
-    <!-- 타임라인 -->
-    <div class="cute-card">
-      <div class="sticker pink">거래 내역</div>
-      <div id="txs-list"></div>
-    </div>
   `;
 
   const txTypeSelect = container.querySelector('#tx-type');
   const regularFields = container.querySelector('#regular-tx-fields');
   const transferFields = container.querySelector('#transfer-tx-fields');
+  const regularAssetSelect = container.querySelector('#tx-asset');
+  const fromAssetSelect = container.querySelector('#tx-from-asset');
+  const toAssetSelect = container.querySelector('#tx-to-asset');
+
+  const updateRequiredAttrs = (type) => {
+    if (type === 'transfer') {
+      regularAssetSelect.removeAttribute('required');
+      fromAssetSelect.setAttribute('required', 'required');
+      toAssetSelect.setAttribute('required', 'required');
+    } else {
+      regularAssetSelect.setAttribute('required', 'required');
+      fromAssetSelect.removeAttribute('required');
+      toAssetSelect.removeAttribute('required');
+    }
+  };
 
   txTypeSelect.addEventListener('change', (e) => {
-    if (e.target.value === 'transfer') {
+    const type = e.target.value;
+    if (type === 'transfer') {
       regularFields.style.display = 'none';
       transferFields.style.display = 'block';
     } else {
       regularFields.style.display = 'block';
       transferFields.style.display = 'none';
     }
+    updateRequiredAttrs(type);
   });
 
-  container.querySelector('#btn-go-categories-edit').addEventListener('click', () => {
-    txSubViewState[userId] = { mode: 'categories' };
+  updateRequiredAttrs(txTypeSelect.value);
+
+  const goBack = () => {
+    state.mode = 'list';
     renderTxsTab(userId, container);
-  });
-
-  const renderTxList = () => {
-    const txs = store.getTransactions(userId);
-    const txsListContainer = container.querySelector('#txs-list');
-    
-    if (txs.length === 0) {
-      txsListContainer.innerHTML = `<div style="text-align:center; padding:20px; color:var(--color-text-muted); font-size:0.85rem;">거래 내역이 없습니다.</div>`;
-      return;
-    }
-
-    txsListContainer.innerHTML = txs.map(tx => {
-      const isMyTx = tx.userId === userId;
-      let title = tx.memo || "내용 없음";
-      let txColor = 'var(--color-text)';
-      let sign = '';
-
-      if (tx.type === 'transfer') {
-        const fromAsset = store.data.assets.find(a => a.id === tx.linkedAssetId)?.name || "포켓";
-        const toAsset = store.data.assets.find(a => a.id === tx.targetAssetId)?.name || "포켓";
-        title = tx.memo ? `${tx.memo} (이체)` : `${fromAsset} → ${toAsset}`;
-        txColor = 'var(--color-text-light)';
-        sign = '⇄ ';
-      } else {
-        const catMeta = categories.find(c => c.id === tx.category) || { emoji: "🎈", name: "기타" };
-        title = `${catMeta.emoji} ${tx.memo || catMeta.name}`;
-        txColor = tx.type === 'expense' ? 'var(--color-red)' : 'var(--color-green)';
-        sign = tx.type === 'expense' ? '-' : '+';
-      }
-
-      if (tx.id.startsWith('tx_adjust_')) {
-        title = `⚙️ ${tx.memo}`;
-      }
-
-      return `
-        <div class="item-row">
-          <div class="item-info">
-            <span class="item-title">${title}</span>
-            <span class="item-sub">
-              ${tx.date} · ${isMyTx ? '나' : partnerName} 
-              ${isMyTx ? `· ${tx.isShared ? '공개' : '비공개'}` : ''}
-              ${tx.id.startsWith('tx_adjust_') ? ` · ${tx.includeInSummary ? '통계합산' : '통계제외'}` : ''}
-            </span>
-          </div>
-          <div style="display:flex; align-items:center; gap:12px;">
-            <span class="item-value" style="color: ${txColor}; font-weight:700;">
-              ${sign}${formatMoney(tx.amount)}
-            </span>
-            ${isMyTx ? `<button class="cute-btn cute-btn-sm neutral btn-delete-tx" data-id="${tx.id}" style="color: var(--color-red); padding: 4px 8px;">삭제</button>` : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    txsListContainer.querySelectorAll('.btn-delete-tx').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = e.target.getAttribute('data-id');
-        if (confirm("이 기록을 삭제하시겠습니까?")) {
-          store.deleteTransaction(id);
-          showToast(container, "기록이 삭제되었습니다.");
-          renderTxList();
-        }
-      });
-    });
   };
 
-  renderTxList();
+  setupAmountInputFormatting(container.querySelector('#tx-amount'));
+
+  container.querySelector('#btn-add-tx-back').addEventListener('click', goBack);
+  
+  container.querySelector('#btn-go-categories-edit-from-add').addEventListener('click', () => {
+    state.mode = 'categories';
+    state.categoriesReferrer = 'add';
+    renderTxsTab(userId, container);
+  });
 
   container.querySelector('#form-add-tx').addEventListener('submit', (e) => {
     e.preventDefault();
     const type = txTypeSelect.value;
-    const amount = container.querySelector('#tx-amount').value;
+    const amount = Number(container.querySelector('#tx-amount').value.replace(/,/g, ''));
     const date = container.querySelector('#tx-date').value;
     const memo = container.querySelector('#tx-memo').value.trim();
-
     const isShared = container.querySelector('#tx-shared').checked;
 
     let linkedAssetId = null;
@@ -1421,12 +1642,337 @@ function renderTxsMainScreen(userId, container) {
     });
 
     showToast(container, "거래가 저장 및 연동 포켓에 반영되었습니다.");
-    e.target.reset();
-    container.querySelector('#tx-date').value = new Date().toISOString().split('T')[0];
-    txTypeSelect.value = 'expense';
-    regularFields.style.display = 'block';
-    transferFields.style.display = 'none';
-    renderTxList();
+    goBack();
+  });
+}
+
+// 🔍 [거래 - 상세 내역 확인 화면]
+function renderTxDetailScreen(userId, container, txId) {
+  const tx = store.data.transactions.find(t => t.id === txId);
+  const state = txSubViewState[userId];
+  if (!tx) {
+    state.mode = 'list';
+    renderTxsTab(userId, container);
+    return;
+  }
+
+  const partnerId = userId === 'user_a' ? 'user_b' : 'user_a';
+  const partnerName = store.data.users[partnerId]?.name || "상대방";
+  const categories = store.getCategories();
+  const catMeta = categories.find(c => c.id === tx.category) || { emoji: "🎈", name: "기타" };
+
+  let typeLabel = '';
+  let typeClass = '';
+  let txColor = 'var(--color-text)';
+  let sign = '';
+  let assetInfoHtml = '';
+
+  if (tx.type === 'transfer') {
+    const fromName = store.data.assets.find(a => a.id === tx.linkedAssetId)?.name || "포켓";
+    const toName = store.data.assets.find(a => a.id === tx.targetAssetId)?.name || "포켓";
+    typeLabel = '이체';
+    typeClass = 'blue';
+    txColor = 'var(--color-text-light)';
+    sign = '⇄ ';
+    assetInfoHtml = `
+      <div style="margin-top: 12px; border-top: 1px solid var(--color-border); padding-top: 12px; font-size: 0.85rem;">
+        <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+          <span style="color:var(--color-text-muted);">보내는 포켓</span>
+          <span style="font-weight: 600; color: var(--color-red);">${fromName}</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:var(--color-text-muted);">받는 포켓</span>
+          <span style="font-weight: 600; color: var(--color-green);">${toName}</span>
+        </div>
+      </div>
+    `;
+  } else {
+    typeLabel = tx.type === 'expense' ? '지출' : '수입';
+    typeClass = tx.type === 'expense' ? 'pink' : 'mint';
+    txColor = tx.type === 'expense' ? 'var(--color-red)' : 'var(--color-green)';
+    sign = tx.type === 'expense' ? '-' : '+';
+    
+    if (tx.linkedAssetId) {
+      const assetName = store.data.assets.find(a => a.id === tx.linkedAssetId)?.name || "포켓";
+      assetInfoHtml = `
+        <div style="margin-top: 12px; border-top: 1px solid var(--color-border); padding-top: 12px; font-size: 0.85rem; display: flex; justify-content: space-between;">
+          <span style="color:var(--color-text-muted);">연동 포켓</span>
+          <span style="font-weight: 600;">${assetName}</span>
+        </div>
+      `;
+    }
+  }
+
+  const isMyTx = tx.userId === userId;
+
+  container.innerHTML = `
+    <div class="cute-card">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom: 16px; border-bottom: 1px solid var(--color-border); padding-bottom:12px;">
+        <button class="cute-btn neutral cute-btn-sm" id="btn-detail-back" style="padding:4px 8px;">‹ 뒤로</button>
+        <h3 class="cute-card-title" style="margin-bottom:0; font-size:1.15rem;">거래 상세 내역</h3>
+      </div>
+
+      <div style="background: #F8F9FA; padding: 20px; border-radius: var(--border-radius-md); margin-bottom: 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="sticker ${typeClass}" style="margin-bottom: 0;">${typeLabel}</span>
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-light);">
+              ${tx.type === 'transfer' ? '이체' : `${catMeta.emoji} ${catMeta.name}`}
+            </span>
+          </div>
+          <span style="font-size:0.75rem; color:var(--color-text-muted); font-weight: 600;">
+            ${tx.date}
+          </span>
+        </div>
+
+        <div style="font-size: 1.6rem; font-weight: 800; color: ${txColor}; margin: 12px 0;">
+          ${sign}${formatMoney(tx.amount)}
+        </div>
+
+        <div style="font-size:0.9rem; color:var(--color-text); background: white; padding: 10px; border-radius: 8px; border: 1px solid var(--color-border); margin-top: 10px;">
+          <span style="color: var(--color-text-muted); font-size: 0.75rem; display: block; margin-bottom: 4px;">메모</span>
+          <strong>${tx.memo || "-"}</strong>
+        </div>
+
+        ${assetInfoHtml}
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; font-size:0.75rem; color:var(--color-text-muted);">
+          <span>기록자: <strong>${isMyTx ? '나' : partnerName}</strong></span>
+          <span>공개 여부: <strong>${tx.isShared ? '공유 중' : '나만 보기'}</strong></span>
+        </div>
+      </div>
+
+      ${isMyTx ? `
+        <div style="display:flex; gap:8px;">
+          <button class="cute-btn secondary" id="btn-detail-edit" style="flex:1;">수정</button>
+          <button class="cute-btn neutral" id="btn-detail-delete" style="flex:1; color: var(--color-red);">삭제</button>
+        </div>
+      ` : `
+        <p style="text-align: center; font-size: 0.75rem; color: var(--color-text-muted);">
+          파트너가 작성한 기록은 수정하거나 삭제할 수 없습니다.
+        </p>
+      `}
+    </div>
+  `;
+
+  const goBack = () => {
+    state.mode = 'list';
+    renderTxsTab(userId, container);
+  };
+
+  container.querySelector('#btn-detail-back').addEventListener('click', goBack);
+
+  if (isMyTx) {
+    container.querySelector('#btn-detail-edit').addEventListener('click', () => {
+      state.mode = 'edit';
+      state.editId = txId;
+      renderTxsTab(userId, container);
+    });
+
+    container.querySelector('#btn-detail-delete').addEventListener('click', () => {
+      if (confirm("이 기록을 정말 삭제하시겠습니까?")) {
+        store.deleteTransaction(txId);
+        showToast(container, "기록이 삭제되었습니다.");
+        goBack();
+      }
+    });
+  }
+}
+
+// ✏️ [거래 - 기록 수정 화면]
+function renderTxEditScreen(userId, container, txId) {
+  const tx = store.data.transactions.find(t => t.id === txId);
+  const state = txSubViewState[userId];
+  if (!tx) {
+    state.mode = 'list';
+    renderTxsTab(userId, container);
+    return;
+  }
+
+  const myAssets = store.data.assets.filter(a => a.userId === userId);
+  const categories = store.getCategories();
+
+  container.innerHTML = `
+    <div class="cute-card">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom: 16px; border-bottom: 1px solid var(--color-border); padding-bottom:12px;">
+        <button class="cute-btn neutral cute-btn-sm" id="btn-edit-tx-back" style="padding:4px 8px;">‹ 뒤로</button>
+        <h3 class="cute-card-title" style="margin-bottom:0; font-size:1.1rem;">기록 수정하기</h3>
+      </div>
+
+      <form id="form-edit-tx" style="margin-top: 12px;">
+        <!-- Row 1: 날짜 & 구분 -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label class="cute-label">날짜</label>
+            <input type="date" class="cute-input" id="edit-tx-date" value="${tx.date}" required>
+          </div>
+          <div>
+            <label class="cute-label">구분</label>
+            <select class="cute-select" id="edit-tx-type">
+              <option value="expense" ${tx.type === 'expense' ? 'selected' : ''}>지출 🍩</option>
+              <option value="income" ${tx.type === 'income' ? 'selected' : ''}>수입 🥕</option>
+              <option value="transfer" ${tx.type === 'transfer' ? 'selected' : ''}>이체 ⇄</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Row 2: 카테고리 & 연동할 포켓 (수입/지출일 때) -->
+        <div id="edit-regular-tx-fields" style="display: ${tx.type === 'transfer' ? 'none' : 'block'};">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="cute-label" style="margin-bottom: 0;">카테고리</label>
+                <button type="button" class="cute-btn neutral cute-btn-sm" id="btn-go-categories-edit-from-edit" style="font-size: 0.72rem; padding: 2px 8px; border-radius: 8px;">⚙️ 설정</button>
+              </div>
+              <select class="cute-select" id="edit-tx-category">
+                ${categories.map(c => `<option value="${c.id}" ${tx.category === c.id ? 'selected' : ''}>${c.emoji} ${c.name}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="cute-label">연동할 내 포켓</label>
+              <select class="cute-select" id="edit-tx-asset" required>
+                <option value="">선택해 주세요</option>
+                ${myAssets.map(a => `<option value="${a.id}" ${tx.linkedAssetId === a.id ? 'selected' : ''}>${a.name}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: 보내는 포켓 & 받는 포켓 (이체일 때) -->
+        <div id="edit-transfer-tx-fields" style="display: ${tx.type === 'transfer' ? 'block' : 'none'}; background: #FFFDF9; border: 1px dashed var(--color-border); padding: 14px; border-radius: var(--border-radius-md); margin-bottom: 12px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <label class="cute-label" style="color:var(--color-red);">보내는 포켓 📤</label>
+              <select class="cute-select" id="edit-tx-from-asset" required style="margin-bottom:0;">
+                <option value="">선택해 주세요</option>
+                ${myAssets.map(a => `<option value="${a.id}" ${tx.linkedAssetId === a.id ? 'selected' : ''}>${a.name} (${formatMoney(a.amount)})</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="cute-label" style="color:var(--color-green);">받는 포켓 📥</label>
+              <select class="cute-select" id="edit-tx-to-asset" required style="margin-bottom:0;">
+                <option value="">선택해 주세요</option>
+                ${myAssets.map(a => `<option value="${a.id}" ${tx.targetAssetId === a.id ? 'selected' : ''}>${a.name} (${formatMoney(a.amount)})</option>`).join('')}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: 금액 -->
+        <div>
+          <label class="cute-label">금액</label>
+          <input type="text" class="cute-input" id="edit-tx-amount" value="${tx.amount}" placeholder="금액 입력" required>
+        </div>
+
+        <!-- Row 4: 내용 -->
+        <div>
+          <label class="cute-label">내용 (선택)</label>
+          <input type="text" class="cute-input" id="edit-tx-memo" value="${tx.memo || ''}" placeholder="예: 저녁 외식, 마트 장보기 등">
+        </div>
+
+        <div style="display:flex; align-items:center; background: #FAFBFB; border:1px solid var(--color-border); border-radius:var(--border-radius-md); padding: 12px; margin-bottom: 16px;">
+          <div class="switch-container" style="margin-bottom:0;">
+            <label class="cute-switch">
+              <input type="checkbox" id="edit-tx-shared" ${tx.isShared ? 'checked' : ''}>
+              <span class="slider"></span>
+            </label>
+            <span style="font-size:0.85rem; font-weight:600; color:var(--color-text-light);">파트너에게 이 거래 공유</span>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="cute-btn neutral" id="btn-edit-tx-cancel" style="flex:1;">취소</button>
+          <button type="submit" class="cute-btn primary" style="flex:2;">수정 완료</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  const txTypeSelect = container.querySelector('#edit-tx-type');
+  const regularFields = container.querySelector('#edit-regular-tx-fields');
+  const transferFields = container.querySelector('#edit-transfer-tx-fields');
+  const regularAssetSelect = container.querySelector('#edit-tx-asset');
+  const fromAssetSelect = container.querySelector('#edit-tx-from-asset');
+  const toAssetSelect = container.querySelector('#edit-tx-to-asset');
+
+  const updateRequiredAttrs = (type) => {
+    if (type === 'transfer') {
+      regularAssetSelect.removeAttribute('required');
+      fromAssetSelect.setAttribute('required', 'required');
+      toAssetSelect.setAttribute('required', 'required');
+    } else {
+      regularAssetSelect.setAttribute('required', 'required');
+      fromAssetSelect.removeAttribute('required');
+      toAssetSelect.removeAttribute('required');
+    }
+  };
+
+  txTypeSelect.addEventListener('change', (e) => {
+    const type = e.target.value;
+    if (type === 'transfer') {
+      regularFields.style.display = 'none';
+      transferFields.style.display = 'block';
+    } else {
+      regularFields.style.display = 'block';
+      transferFields.style.display = 'none';
+    }
+    updateRequiredAttrs(type);
+  });
+
+  updateRequiredAttrs(txTypeSelect.value);
+
+  const goBack = () => {
+    state.mode = 'detail';
+    renderTxsTab(userId, container);
+  };
+
+  setupAmountInputFormatting(container.querySelector('#edit-tx-amount'));
+
+  container.querySelector('#btn-edit-tx-back').addEventListener('click', goBack);
+  container.querySelector('#btn-edit-tx-cancel').addEventListener('click', goBack);
+
+  container.querySelector('#btn-go-categories-edit-from-edit').addEventListener('click', () => {
+    state.mode = 'categories';
+    state.categoriesReferrer = 'edit';
+    state.categoriesEditId = txId;
+    renderTxsTab(userId, container);
+  });
+
+  container.querySelector('#form-edit-tx').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const type = txTypeSelect.value;
+    const amount = Number(container.querySelector('#edit-tx-amount').value.replace(/,/g, ''));
+    const date = container.querySelector('#edit-tx-date').value;
+    const memo = container.querySelector('#edit-tx-memo').value.trim();
+    const isShared = container.querySelector('#edit-tx-shared').checked;
+
+    let linkedAssetId = null;
+    let targetAssetId = null;
+    let category = "etc";
+
+    if (type === 'transfer') {
+      linkedAssetId = container.querySelector('#edit-tx-from-asset').value;
+      targetAssetId = container.querySelector('#edit-tx-to-asset').value;
+
+      if (!linkedAssetId || !targetAssetId) {
+        alert("보내는 포켓과 받는 포켓을 모두 선택해 주세요.");
+        return;
+      }
+      if (linkedAssetId === targetAssetId) {
+        alert("보내는 포켓과 받는 포켓은 같을 수 없습니다.");
+        return;
+      }
+    } else {
+      category = container.querySelector('#edit-tx-category').value;
+      linkedAssetId = container.querySelector('#edit-tx-asset').value || null;
+    }
+
+    store.updateTransaction(txId, {
+      type, category, amount, date, memo: memo || null, isShared, linkedAssetId, targetAssetId
+    });
+
+    showToast(container, "기록이 수정되었습니다.");
+    goBack();
   });
 }
 
@@ -1540,7 +2086,11 @@ function renderCategoriesManagementScreen(userId, container) {
   });
 
   const goBack = () => {
-    txSubViewState[userId] = { mode: 'list' };
+    const referrer = txSubViewState[userId].categoriesReferrer || 'list';
+    txSubViewState[userId].mode = referrer;
+    if (referrer === 'edit') {
+      txSubViewState[userId].editId = txSubViewState[userId].categoriesEditId;
+    }
     renderTxsTab(userId, container);
   };
 

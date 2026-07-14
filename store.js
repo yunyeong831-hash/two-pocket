@@ -443,7 +443,26 @@ class JointWalletStore {
     // 1) 로컬 오프라인 매칭 (두 탭 간 LocalStorage 공유 시)
     if (!chosenRole && storedCode && storedCode === cleanCode) {
       if (this.data.status === 'active') {
-        return { status: 'require_role_choice', dbData: this.data };
+        const pinA = this.data.users.A?.pin || "";
+        const pinB = this.data.users.B?.pin || "";
+        
+        if (partnerPin && pinA === partnerPin && pinB !== partnerPin) {
+          this.data.myUserId = "user_a";
+          this.data.status = 'active';
+          this._save();
+          return { status: 'success' };
+        } else if (partnerPin && pinB === partnerPin && pinA !== partnerPin) {
+          this.data.myUserId = "user_b";
+          this.data.status = 'active';
+          this._save();
+          return { status: 'success' };
+        } else if (partnerPin && pinA === partnerPin && pinB === partnerPin) {
+          // 둘의 비밀번호가 우연히 정확히 같은 경우만 기존 수동 복원 모달 호출
+          return { status: 'require_role_choice', dbData: this.data };
+        } else {
+          // 둘 다 일치하지 않을 때
+          return { status: 'pin_failed' };
+        }
       }
       this.data.myUserId = "user_b";
       this.data.users.B.name = partnerName || "몽글이";
@@ -508,7 +527,40 @@ class JointWalletStore {
 
           // B. 이미 활성화(active)된 지갑방인데 역할 지정 없이 처음 노크한 경우 ➔ 복원 역할 선택 호출
           if (dbData.status === 'active') {
-            return { status: 'require_role_choice', dbData: dbData };
+            const pinA = dbUsers.A?.pin || "";
+            const pinB = dbUsers.B?.pin || "";
+            
+            if (partnerPin && pinA === partnerPin && pinB !== partnerPin) {
+              // User A로 자동 매칭 복원
+              this.data.walletId = matchedWalletId;
+              this.data.myUserId = "user_a";
+              this.data.status = 'active';
+              this.data.walletName = dbData.walletName || this.data.walletName;
+              this.data.users = dbData.users || this.data.users;
+              this.data.categories = dbData.categories || this.data.categories;
+              
+              this._save();
+              this._startFirebaseSync();
+              return { status: 'success' };
+            } else if (partnerPin && pinB === partnerPin && pinA !== partnerPin) {
+              // User B로 자동 매칭 복원
+              this.data.walletId = matchedWalletId;
+              this.data.myUserId = "user_b";
+              this.data.status = 'active';
+              this.data.walletName = dbData.walletName || this.data.walletName;
+              this.data.users = dbData.users || this.data.users;
+              this.data.categories = dbData.categories || this.data.categories;
+              
+              this._save();
+              this._startFirebaseSync();
+              return { status: 'success' };
+            } else if (partnerPin && pinA === partnerPin && pinB === partnerPin) {
+              // 둘의 비밀번호가 우연히 정확히 같은 경우만 기존 수동 복원 모달 호출
+              return { status: 'require_role_choice', dbData: dbData };
+            } else {
+              // 둘 다 일치하지 않을 때
+              return { status: 'pin_failed' };
+            }
           }
 
           // C. 신규 조인 참여(몽글이 가입 단계)
@@ -792,6 +844,25 @@ class JointWalletStore {
     if (this.syncManager.isActive()) {
       this.syncManager.deleteDocument(this.data.walletId, 'transactions', txId);
     }
+  }
+
+  updateTransaction(txId, fields) {
+    const idx = this.data.transactions.findIndex(t => t.id === txId);
+    if (idx !== -1) {
+      const updatedTx = {
+        ...this.data.transactions[idx],
+        ...fields,
+        amount: fields.amount !== undefined ? Number(fields.amount) : this.data.transactions[idx].amount
+      };
+      this.data.transactions[idx] = updatedTx;
+      this._save();
+
+      if (this.syncManager.isActive()) {
+        this.syncManager.saveDocument(this.data.walletId, 'transactions', txId, updatedTx);
+      }
+      return updatedTx;
+    }
+    return null;
   }
 
   exportToCSV() {
